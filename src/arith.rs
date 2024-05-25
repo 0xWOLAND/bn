@@ -303,7 +303,7 @@ impl U256 {
 
     /// Multiply `self` by `other` (mod `modulo`) via the Montgomery
     /// multiplication method.
-    // #[cfg(target_os = "zkvm")]
+    #[cfg(target_os = "zkvm")]
     pub fn mul(&mut self, other: &U256, modulo: &U256, inv: u128) {
         let mut out = [0u32; 8];
         sys_bigint(
@@ -317,14 +317,14 @@ impl U256 {
             .copy_from_slice(&bytemuck::cast::<[u32; 8], [u128; 2]>(out));
     }
 
-    // #[cfg(not(target_os = "zkvm"))]
-    // pub fn mul(&mut self, other: &U256, modulo: &U256, inv: u128) {
-    //     mul_reduce(&mut self.0, &other.0, &modulo.0, inv);
+    #[cfg(not(target_os = "zkvm"))]
+    pub fn mul(&mut self, other: &U256, modulo: &U256, inv: u128) {
+        mul_reduce(&mut self.0, &other.0, &modulo.0, inv);
 
-    //     if *self >= *modulo {
-    //         sub_noborrow(&mut self.0, &modulo.0);
-    //     }
-    // }
+        if *self >= *modulo {
+            sub_noborrow(&mut self.0, &modulo.0);
+        }
+    }
 
     /// Turn `self` into its additive inverse (mod `modulo`)
     pub fn neg(&mut self, modulo: &U256) {
