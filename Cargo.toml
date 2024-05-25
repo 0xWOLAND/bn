@@ -1,9 +1,12 @@
 [package]
 name = "substrate-bn"
-version = "0.5.0"
-authors = ["Sean Bowe <ewillbefull@gmail.com>", "Parity Technologies <admin@parity.io>"]
+version = "0.6.0"
+authors = [
+    "Sean Bowe <ewillbefull@gmail.com>",
+    "Parity Technologies <admin@parity.io>",
+]
 description = "Pairing cryptography with the Barreto-Naehrig curve"
-keywords = ["pairing","crypto","cryptography"]
+keywords = ["pairing", "crypto", "cryptography"]
 readme = "README.md"
 homepage = "https://github.com/paritytech/bn"
 repository = "https://github.com/paritytech/bn"
@@ -11,23 +14,18 @@ license = "MIT OR Apache-2.0"
 edition = "2018"
 
 [features]
-default = ["rustc-serialize"]
+default = []
 
 [[bench]]
 name = "api"
 
 [dependencies]
 rand = { version = "0.8.3", default-features = false }
-rustc-serialize = { version = "0.3", optional = true }
 byteorder = { version = "1.0", features = ["i128"], default-features = false }
 crunchy = "0.2.1"
 lazy_static = { version = "1.4.0", features = ["spin_no_std"] }
 rustc-hex = { version = "2", default-features = false }
+sp1-zkvm = { git = "https://github.com/succinctlabs/sp1.git", branch = "main" }
 
 [dev-dependencies]
 rand = { version = "0.8.3", features = ["std_rng"] }
-
-[dev-dependencies.bincode]
-version = "0.6"
-default-features = false
-features = ["rustc-serialize"]

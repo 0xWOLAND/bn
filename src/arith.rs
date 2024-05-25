@@ -1,9 +1,10 @@
-use core::cmp::Ordering;
+use core::{cmp::Ordering, convert};
+use crunchy::unroll;
 use rand::Rng;
 
-#[cfg(feature = "rustc-serialize")]
-use rustc_serialize::{Decodable, Decoder, Encodable, Encoder};
 use byteorder::{BigEndian, ByteOrder};
+use core::mem;
+use sp1_zkvm::precompiles::bigint_mulmod::sys_bigint;
 
 /// 256-bit, stack allocated biginteger for use in prime field
 /// arithmetic.
@@ -80,7 +81,7 @@ impl U512 {
         U512(res)
     }
 
-     pub fn from_slice(s: &[u8]) -> Result<U512, Error> {
+    pub fn from_slice(s: &[u8]) -> Result<U512, Error> {
         if s.len() != 64 {
             return Err(Error::InvalidLength {
                 expected: 32,
@@ -145,66 +146,6 @@ impl U512 {
         }
 
         U512(n)
-    }
-}
-
-#[cfg(feature = "rustc-serialize")]
-impl Encodable for U512 {
-    fn encode<S: Encoder>(&self, s: &mut S) -> Result<(), S::Error> {
-        let mut buf = [0; 4 * 16];
-
-        for (l, i) in (0..4).rev().zip((0..4).map(|i| i * 16)) {
-            BigEndian::write_u128(&mut buf[i..], self.0[l]);
-        }
-
-        for i in 0..(4 * 16) {
-            s.emit_u8(buf[i])?;
-        }
-
-        Ok(())
-    }
-}
-
-#[cfg(feature = "rustc-serialize")]
-impl Decodable for U512 {
-    fn decode<S: Decoder>(s: &mut S) -> Result<U512, S::Error> {
-        let mut buf = [0; 4 * 16];
-
-        for i in 0..(4 * 16) {
-            buf[i] = s.read_u8()?;
-        }
-
-        Ok(U512::interpret(&buf))
-    }
-}
-
-#[cfg(feature = "rustc-serialize")]
-impl Encodable for U256 {
-    fn encode<S: Encoder>(&self, s: &mut S) -> Result<(), S::Error> {
-        let mut buf = [0; 2 * 16];
-
-        for (l, i) in (0..2).rev().zip((0..2).map(|i| i * 16)) {
-            BigEndian::write_u128(&mut buf[i..], self.0[l]);
-        }
-
-        for i in 0..(2 * 16) {
-            s.emit_u8(buf[i])?;
-        }
-
-        Ok(())
-    }
-}
-
-#[cfg(feature = "rustc-serialize")]
-impl Decodable for U256 {
-    fn decode<S: Decoder>(s: &mut S) -> Result<U256, S::Error> {
-        let mut buf = [0; 2 * 16];
-
-        for i in 0..(2 * 16) {
-            buf[i] = s.read_u8()?;
-        }
-
-        U256::from_slice(&buf).map_err(|_| s.error("Invalid input length; Also unreachable;"))
     }
 }
 
@@ -356,8 +297,26 @@ impl U256 {
         sub_noborrow(&mut self.0, &other.0);
     }
 
+    pub fn convert(data: &[u128; 2]) -> [u32; 8] {
+        unsafe { mem::transmute(*data) }
+    }
+
     /// Multiply `self` by `other` (mod `modulo`) via the Montgomery
     /// multiplication method.
+    #[cfg(target_os = "zkvm")]
+    pub fn mul(&mut self, other: &U256, modulo: &U256, inv: u128) {
+        let mut out = [0u32; 8];
+        sys_bigint(
+            &mut out,
+            0,
+            &U256::convert(&self.0),
+            &U256::convert(&other.0),
+            &U256::convert(&modulo.0),
+        );
+        self.0.copy_from_slice(out);
+    }
+
+    #[cfg(not(target_os = "zkvm"))]
     pub fn mul(&mut self, other: &U256, modulo: &U256, inv: u128) {
         mul_reduce(&mut self.0, &other.0, &modulo.0, inv);
 
