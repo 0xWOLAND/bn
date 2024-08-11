@@ -388,23 +388,13 @@ impl GroupParams for G1Params {
     fn one() -> G<Self> {
         G {
             x: Fq::one(),
-            y: const_fq([
-                0xa6ba871b8b1e1b3a,
-                0x14f1d651eb8e167b,
-                0xccdd46def0f28c58,
-                0x1c14ef83340fbe5e,
-            ]),
+            y: const_fq([2, 0, 0, 0]),
             z: Fq::one(),
         }
     }
 
     fn coeff_b() -> Fq {
-        const_fq([
-            0x7a17caa950ad28d7,
-            0x1f6ac17ae15521b9,
-            0x334bea4e696bd284,
-            0x2a1f6744ce179d8e,
-        ])
+        const_fq([3, 0, 0, 0])
     }
 }
 
@@ -426,30 +416,30 @@ impl GroupParams for G2Params {
         G {
             x: Fq2::new(
                 const_fq([
-                    0x8e83b5d102bc2026,
-                    0xdceb1935497b0172,
-                    0xfbb8264797811adf,
-                    0x19573841af96503b,
+                    0x46debd5cd992f6ed,
+                    0x674322d4f75edadd,
+                    0x426a00665e5c4479,
+                    0x1800deef121f1e76,
                 ]),
                 const_fq([
-                    0xafb4737da84c6140,
-                    0x6043dd5a5802d8c4,
-                    0x09e950fc52a02f86,
-                    0x14fef0833aea7b6b,
+                    0x97e485b7aef312c2,
+                    0xf1aa493335a9e712,
+                    0x7260bfb731fb5d25,
+                    0x198e9393920d483a,
                 ]),
             ),
             y: Fq2::new(
                 const_fq([
-                    0x619dfa9d886be9f6,
-                    0xfe7fd297f59e9b78,
-                    0xff9e1a62231b7dfe,
-                    0x28fd7eebae9e4206,
+                    0x4ce6cc0166fa7daa,
+                    0xe3d1e7690c43d37b,
+                    0x4aab71808dcb408f,
+                    0x12c85ea5db8c6deb,
                 ]),
                 const_fq([
-                    0x64095b56c71856ee,
-                    0xdc57f922327d3cbb,
-                    0x55f935be33351076,
-                    0x0da4a0e693fd6482,
+                    0x55acdadcd122975b,
+                    0xbc4b313370b38ef3,
+                    0xec9e99ad690c3395,
+                    0x90689d0585ff075,
                 ]),
             ),
             z: Fq2::one(),
@@ -459,16 +449,16 @@ impl GroupParams for G2Params {
     fn coeff_b() -> Fq2 {
         Fq2::new(
             const_fq([
-                0x3bf938e377b802a8,
-                0x020b1b273633535d,
-                0x26b7edf049755260,
-                0x2514c6324384a86d,
+                0x3267e6dc24a138e5,
+                0xb5b4c5e559dbefa3,
+                0x81be18991be06ac3,
+                0x2b149d40ceb8aaae,
             ]),
             const_fq([
-                0x38e7ecccd1dcff67,
-                0x65f0b37d93ce0d3e,
-                0xd749d0dd22ac00aa,
-                0x0141b9ce4a688d4d,
+                0xe4a2bd0685c315d2,
+                0xa74fa084e52d1852,
+                0xcd2cafadeed8fdf4,
+                0x9713b03af0fed4,
             ]),
         )
     }
@@ -527,10 +517,10 @@ fn twist() -> Fq2 {
 #[inline]
 fn two_inv() -> Fq {
     const_fq([
-        9781510331150239090,
-        15059239858463337189,
-        10331104244869713732,
-        2249375503248834476,
+        0x9e10460b6c3e7ea4,
+        0xcbc0b548b438e546,
+        0xdc2822db40c0ac2e,
+        0x183227397098d014,
     ])
 }
 
@@ -538,16 +528,16 @@ fn two_inv() -> Fq {
 fn twist_mul_by_q_x() -> Fq2 {
     Fq2::new(
         const_fq([
-            13075984984163199792,
-            3782902503040509012,
-            8791150885551868305,
-            1825854335138010348,
+            0x99e39557176f553d,
+            0xb78cc310c2c3330c,
+            0x4c0bec3cf559b143,
+            0x2fb347984f7911f7,
         ]),
         const_fq([
-            7963664994991228759,
-            12257807996192067905,
-            13179524609921305146,
-            2767831111890561987,
+            0x1665d51c640fcba2,
+            0x32ae2a1d0b7c9dce,
+            0x4ba4cc8bd75a0794,
+            0x16c9e55061ebae20,
         ]),
     )
 }
@@ -556,16 +546,16 @@ fn twist_mul_by_q_x() -> Fq2 {
 fn twist_mul_by_q_y() -> Fq2 {
     Fq2::new(
         const_fq([
-            16482010305593259561,
-            13488546290961988299,
-            3578621962720924518,
-            2681173117283399901,
+            0xdc54014671a0135a,
+            0xdbaae0eda9c95998,
+            0xdc5ec698b6e2f9b9,
+            0x63cf305489af5dc,
         ]),
         const_fq([
-            11661927080404088775,
-            553939530661941723,
-            7860678177968807019,
-            3208568454732775116,
+            0x82d37f632623b0e3,
+            0x21807dc98fa25bd2,
+            0x704b5a7ec796f2b,
+            0x7c03cbcac41049a,
         ]),
     )
 }

@@ -8,29 +8,16 @@ fn fq_non_residue() -> Fq {
     // (q - 1) is a quadratic nonresidue in Fq
     // 21888242871839275222246405745257275088696311157297823662689037894645226208582
     const_fq([
-        0x68c3488912edefaa,
-        0x8d087f6872aabf4f,
-        0x51e1a24709081231,
-        0x2259d6b14729c0fa,
+        0x3c208c16d87cfd46,
+        0x97816a916871ca8d,
+        0xb85045b68181585d,
+        0x30644e72e131a029,
     ])
 }
 
 #[inline]
 pub fn fq2_nonresidue() -> Fq2 {
-    Fq2::new(
-        const_fq([
-            0xf60647ce410d7ff7,
-            0x2f3d6f4dd31bd011,
-            0x2943337e3940c6d1,
-            0x1d9598e8a7e39857,
-        ]),
-        const_fq([
-            0xd35d438dc58f0d9d,
-            0x0a78eb28f5c70b3d,
-            0x666ea36f7879462c,
-            0x0e0a77c19a07df2f,
-        ]),
-    )
+    Fq2::new(const_fq([9, 0, 0, 0]), const_fq([1, 0, 0, 0]))
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]

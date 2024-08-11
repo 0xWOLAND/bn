@@ -48,8 +48,9 @@ impl Fr {
             .map(|x| Fr::new_mul_factor(x))
     }
     pub fn to_big_endian(&self, slice: &mut [u8]) -> Result<(), FieldError> {
+        // NOTE: serialized in Montgomery form (as in the original bn crate)
         self.0
-            .raw()
+            .to_mont()
             .to_big_endian(slice)
             .map_err(|_| FieldError::InvalidSliceLength)
     }
@@ -158,13 +159,7 @@ impl Fq {
             .map(|x| Fq(x))
     }
     pub fn to_big_endian(&self, slice: &mut [u8]) -> Result<(), FieldError> {
-        let mut a: arith::U256 = self.0.into();
-        // convert from Montgomery representation
-        a.mul(
-            &fields::Fq::one().raw(),
-            &fields::Fq::modulus(),
-            self.0.inv(),
-        );
+        let a: arith::U256 = self.0.into();
         a.to_big_endian(slice)
             .map_err(|_| FieldError::InvalidSliceLength)
     }
