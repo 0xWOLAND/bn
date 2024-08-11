@@ -303,7 +303,9 @@ impl U256 {
             let x_ptr: *const [u32; 8] = (&self.0) as *const [u128; 2] as *const [u32; 8];
             let y_ptr: *const [u32; 8] = (&other.0) as *const [u128; 2] as *const [u32; 8];
             let res_ptr: *mut [u32; 8] = (&mut self.0) as *mut [u128; 2] as *mut [u32; 8];
-            sp1_lib::sys_bigint(res_ptr, 0, x_ptr, y_ptr, mod_ptr);
+            unsafe {
+                sp1_lib::sys_bigint(res_ptr, 0, x_ptr, y_ptr, mod_ptr);
+            }
         }
         #[cfg(not(all(target_os = "zkvm", target_vendor = "succinct")))]
         {
