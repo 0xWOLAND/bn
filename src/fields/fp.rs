@@ -4,226 +4,456 @@ use alloc::vec::Vec;
 use core::ops::{Add, Mul, Neg, Sub};
 use rand::Rng;
 
-macro_rules! field_impl {
-    ($name:ident, $modulus:expr, $rinv:expr, $r:expr) => {
-        #[derive(Copy, Clone, PartialEq, Eq, Debug)]
-        #[repr(C)]
-        pub struct $name(U256);
+#[cfg(all(target_os = "zkvm", target_vendor = "succinct"))]
+use core::mem::transmute;
 
-        impl From<$name> for U256 {
-            #[inline]
-            fn from(a: $name) -> Self {
-                a.0
-            }
-        }
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+#[repr(C)]
+pub struct Fr(U256);
 
-        impl $name {
-            #[inline]
-            #[allow(dead_code)]
-            pub(crate) fn to_mont(&self) -> U256 {
-                let mut res = self.0;
-                res.mul(&U256::from($r), &Self::modulus());
-                res
-            }
-
-            #[inline]
-            #[allow(dead_code)]
-            pub(crate) fn from_mont(mont: &U256) -> Self {
-                let mut res = U256::from($rinv);
-                res.mul(mont, &Self::modulus());
-                Self(res)
-            }
-
-            /// Convert from decimal string
-            pub fn from_str(s: &str) -> Option<Self> {
-                let ints: Vec<_> = {
-                    let mut acc = Self::zero();
-                    (0..11)
-                        .map(|_| {
-                            let tmp = acc;
-                            acc = acc + Self::one();
-                            tmp
-                        })
-                        .collect()
-                };
-
-                let mut res = Self::zero();
-                for c in s.chars() {
-                    match c.to_digit(10) {
-                        Some(d) => {
-                            res = res * ints[10];
-                            res = res + ints[d as usize];
-                        }
-                        None => {
-                            return None;
-                        }
-                    }
-                }
-
-                Some(res)
-            }
-
-            /// Converts a U256 to an Fp so long as it's below the modulus.
-            pub fn new(a: U256) -> Option<Self> {
-                if a < U256::from($modulus) {
-                    Some($name(a))
-                } else {
-                    None
-                }
-            }
-
-            /// Converts a U256 to an Fr regardless of modulus.
-            pub fn new_mul_factor(a: U256) -> Self {
-                $name(a)
-            }
-
-            pub fn interpret(buf: &[u8; 64]) -> Self {
-                $name::new(U512::interpret(buf).divrem(&U256::from($modulus)).1).unwrap()
-            }
-
-            /// Returns the modulus
-            #[inline]
-            #[allow(dead_code)]
-            pub fn modulus() -> U256 {
-                U256::from($modulus)
-            }
-
-            #[inline]
-            #[allow(dead_code)]
-            pub fn inv(&self) -> u128 {
-                unimplemented!("n' inverse is not used")
-            }
-
-            #[inline]
-            #[allow(dead_code)]
-            pub fn raw(&self) -> &U256 {
-                unimplemented!("raw representation is not in Montgomery form")
-            }
-
-            pub fn set_bit(&mut self, bit: usize, to: bool) {
-                self.0.set_bit(bit, to);
-            }
-        }
-
-        impl FieldElement for $name {
-            #[inline]
-            fn zero() -> Self {
-                $name(U256::from([0, 0, 0, 0]))
-            }
-
-            #[inline]
-            fn one() -> Self {
-                $name(U256::from([1, 0, 0, 0]))
-            }
-
-            fn random<R: Rng>(rng: &mut R) -> Self {
-                $name(U256::random(rng, &Self::modulus()))
-            }
-
-            #[inline]
-            fn is_zero(&self) -> bool {
-                self.0.is_zero()
-            }
-
-            fn inverse(mut self) -> Option<Self> {
-                if self.is_zero() {
-                    None
-                } else {
-                    self.0.invert(&Self::modulus());
-                    Some(self)
-                }
-            }
-        }
-
-        impl Add for $name {
-            type Output = $name;
-
-            #[inline]
-            fn add(mut self, other: $name) -> $name {
-                self.0.add(&other.0, &Self::modulus());
-
-                self
-            }
-        }
-
-        impl Sub for $name {
-            type Output = $name;
-
-            #[inline]
-            fn sub(mut self, other: $name) -> $name {
-                self.0.sub(&other.0, &Self::modulus());
-
-                self
-            }
-        }
-
-        impl Mul for $name {
-            type Output = $name;
-
-            #[inline]
-            fn mul(mut self, other: $name) -> $name {
-                self.0.mul(&other.0, &Self::modulus());
-
-                self
-            }
-        }
-
-        impl Neg for $name {
-            type Output = $name;
-
-            #[inline]
-            fn neg(mut self) -> $name {
-                self.0.neg(&Self::modulus());
-
-                self
-            }
-        }
-    };
+impl From<Fr> for U256 {
+    #[inline]
+    fn from(a: Fr) -> Self {
+        a.0
+    }
 }
 
-field_impl!(
-    Fr,
-    [
-        0x43e1f593f0000001,
-        0x2833e84879b97091,
-        0xb85045b68181585d,
-        0x30644e72e131a029
-    ],
-    [
-        0xdc5ba0056db1194e,
-        0x90ef5a9e111ec87,
-        0xc8260de4aeb85d5d,
-        0x15ebf95182c5551c
-    ],
-    [
-        0xac96341c4ffffffb,
-        0x36fc76959f60cd29,
-        0x666ea36f7879462e,
-        0xe0a77c19a07df2f,
-    ]
-);
+impl Fr {
+    #[inline]
+    #[allow(dead_code)]
+    pub(crate) fn to_mont(&self) -> U256 {
+        let mut res = self.0;
+        res.mul(
+            &U256::from([
+                0xac96341c4ffffffb,
+                0x36fc76959f60cd29,
+                0x666ea36f7879462e,
+                0xe0a77c19a07df2f,
+            ]),
+            &Self::modulus(),
+        );
+        res
+    }
 
-field_impl!(
-    Fq,
-    [
-        0x3c208c16d87cfd47,
-        0x97816a916871ca8d,
-        0xb85045b68181585d,
-        0x30644e72e131a029
-    ],
-    [
-        0xed84884a014afa37,
-        0xeb2022850278edf8,
-        0xcf63e9cfb74492d9,
-        0x2e67157159e5c639
-    ],
-    [
-        0xd35d438dc58f0d9d,
-        0xa78eb28f5c70b3d,
-        0x666ea36f7879462c,
-        0xe0a77c19a07df2f
-    ]
-);
+    #[inline]
+    #[allow(dead_code)]
+    pub(crate) fn from_mont(mont: &U256) -> Self {
+        let mut res = U256::from([
+            0xdc5ba0056db1194e,
+            0x90ef5a9e111ec87,
+            0xc8260de4aeb85d5d,
+            0x15ebf95182c5551c,
+        ]);
+        res.mul(mont, &Self::modulus());
+        Self(res)
+    }
+
+    /// Convert from decimal string
+    pub fn from_str(s: &str) -> Option<Self> {
+        let ints: Vec<_> = {
+            let mut acc = Self::zero();
+            (0..11)
+                .map(|_| {
+                    let tmp = acc;
+                    acc = acc + Self::one();
+                    tmp
+                })
+                .collect()
+        };
+
+        let mut res = Self::zero();
+        for c in s.chars() {
+            match c.to_digit(10) {
+                Some(d) => {
+                    res = res * ints[10];
+                    res = res + ints[d as usize];
+                }
+                None => {
+                    return None;
+                }
+            }
+        }
+
+        Some(res)
+    }
+
+    /// Converts a U256 to an Fp so long as it's below the modulus.
+    pub fn new(a: U256) -> Option<Self> {
+        if a < U256::from([
+            0x43e1f593f0000001,
+            0x2833e84879b97091,
+            0xb85045b68181585d,
+            0x30644e72e131a029,
+        ]) {
+            Some(Fr(a))
+        } else {
+            None
+        }
+    }
+
+    /// Converts a U256 to an Fr regardless of modulus.
+    pub fn new_mul_factor(a: U256) -> Self {
+        Fr(a)
+    }
+
+    pub fn interpret(buf: &[u8; 64]) -> Self {
+        Fr::new(
+            U512::interpret(buf)
+                .divrem(&U256::from([
+                    0x43e1f593f0000001,
+                    0x2833e84879b97091,
+                    0xb85045b68181585d,
+                    0x30644e72e131a029,
+                ]))
+                .1,
+        )
+        .unwrap()
+    }
+
+    /// Returns the modulus
+    #[inline]
+    #[allow(dead_code)]
+    pub fn modulus() -> U256 {
+        U256::from([
+            0x43e1f593f0000001,
+            0x2833e84879b97091,
+            0xb85045b68181585d,
+            0x30644e72e131a029,
+        ])
+    }
+
+    #[inline]
+    #[allow(dead_code)]
+    pub fn inv(&self) -> u128 {
+        unimplemented!("n' inverse is not used")
+    }
+
+    #[inline]
+    #[allow(dead_code)]
+    pub fn raw(&self) -> &U256 {
+        unimplemented!("raw representation is not in Montgomery form")
+    }
+
+    pub fn set_bit(&mut self, bit: usize, to: bool) {
+        self.0.set_bit(bit, to);
+    }
+}
+
+impl FieldElement for Fr {
+    #[inline]
+    fn zero() -> Self {
+        Fr(U256::from([0, 0, 0, 0]))
+    }
+
+    #[inline]
+    fn one() -> Self {
+        Fr(U256::from([1, 0, 0, 0]))
+    }
+
+    fn random<R: Rng>(rng: &mut R) -> Self {
+        Fr(U256::random(rng, &Self::modulus()))
+    }
+
+    #[inline]
+    fn is_zero(&self) -> bool {
+        self.0.is_zero()
+    }
+
+    fn inverse(mut self) -> Option<Self> {
+        if self.is_zero() {
+            None
+        } else {
+            self.0.invert(&Self::modulus());
+            Some(self)
+        }
+    }
+}
+
+impl Add for Fr {
+    type Output = Fr;
+
+    #[inline]
+    fn add(mut self, other: Fr) -> Fr {
+        self.0.add(&other.0, &Self::modulus());
+
+        self
+    }
+}
+
+impl Sub for Fr {
+    type Output = Fr;
+
+    #[inline]
+    fn sub(mut self, other: Fr) -> Fr {
+        self.0.sub(&other.0, &Self::modulus());
+
+        self
+    }
+}
+
+impl Mul for Fr {
+    type Output = Fr;
+
+    #[inline]
+    fn mul(mut self, other: Fr) -> Fr {
+        self.0.mul(&other.0, &Self::modulus());
+
+        self
+    }
+}
+
+impl Neg for Fr {
+    type Output = Fr;
+
+    #[inline]
+    fn neg(mut self) -> Fr {
+        self.0.neg(&Self::modulus());
+
+        self
+    }
+}
+
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+#[repr(C)]
+pub struct Fq(U256);
+
+impl From<Fq> for U256 {
+    #[inline]
+    fn from(a: Fq) -> Self {
+        a.0
+    }
+}
+
+impl Fq {
+    #[inline]
+    #[allow(dead_code)]
+    pub(crate) fn to_mont(&self) -> U256 {
+        let mut res = self.0;
+        res.mul(
+            &U256::from([
+                0xd35d438dc58f0d9d,
+                0xa78eb28f5c70b3d,
+                0x666ea36f7879462c,
+                0xe0a77c19a07df2f,
+            ]),
+            &Self::modulus(),
+        );
+        res
+    }
+
+    #[inline]
+    #[allow(dead_code)]
+    pub(crate) fn from_mont(mont: &U256) -> Self {
+        let mut res = U256::from([
+            0xed84884a014afa37,
+            0xeb2022850278edf8,
+            0xcf63e9cfb74492d9,
+            0x2e67157159e5c639,
+        ]);
+        res.mul(mont, &Self::modulus());
+        Self(res)
+    }
+
+    /// Convert from decimal string
+    pub fn from_str(s: &str) -> Option<Self> {
+        let ints: Vec<_> = {
+            let mut acc = Self::zero();
+            (0..11)
+                .map(|_| {
+                    let tmp = acc;
+                    acc = acc + Self::one();
+                    tmp
+                })
+                .collect()
+        };
+
+        let mut res = Self::zero();
+        for c in s.chars() {
+            match c.to_digit(10) {
+                Some(d) => {
+                    res = res * ints[10];
+                    res = res + ints[d as usize];
+                }
+                None => {
+                    return None;
+                }
+            }
+        }
+
+        Some(res)
+    }
+
+    /// Converts a U256 to an Fp so long as it's below the modulus.
+    pub fn new(a: U256) -> Option<Self> {
+        if a < U256::from([
+            0x3c208c16d87cfd47,
+            0x97816a916871ca8d,
+            0xb85045b68181585d,
+            0x30644e72e131a029,
+        ]) {
+            Some(Fq(a))
+        } else {
+            None
+        }
+    }
+
+    /// Converts a U256 to an Fr regardless of modulus.
+    pub fn new_mul_factor(a: U256) -> Self {
+        Fq(a)
+    }
+
+    pub fn interpret(buf: &[u8; 64]) -> Self {
+        Fq::new(
+            U512::interpret(buf)
+                .divrem(&U256::from([
+                    0x3c208c16d87cfd47,
+                    0x97816a916871ca8d,
+                    0xb85045b68181585d,
+                    0x30644e72e131a029,
+                ]))
+                .1,
+        )
+        .unwrap()
+    }
+
+    /// Returns the modulus
+    #[inline]
+    #[allow(dead_code)]
+    pub fn modulus() -> U256 {
+        U256::from([
+            0x3c208c16d87cfd47,
+            0x97816a916871ca8d,
+            0xb85045b68181585d,
+            0x30644e72e131a029,
+        ])
+    }
+
+    #[inline]
+    #[allow(dead_code)]
+    pub fn inv(&self) -> u128 {
+        unimplemented!("n' inverse is not used")
+    }
+
+    #[inline]
+    #[allow(dead_code)]
+    pub fn raw(&self) -> &U256 {
+        unimplemented!("raw representation is not in Montgomery form")
+    }
+
+    pub fn set_bit(&mut self, bit: usize, to: bool) {
+        self.0.set_bit(bit, to);
+    }
+}
+
+impl FieldElement for Fq {
+    #[inline]
+    fn zero() -> Self {
+        Fq(U256::from([0, 0, 0, 0]))
+    }
+
+    #[inline]
+    fn one() -> Self {
+        Fq(U256::from([1, 0, 0, 0]))
+    }
+
+    fn random<R: Rng>(rng: &mut R) -> Self {
+        Fq(U256::random(rng, &Self::modulus()))
+    }
+
+    #[inline]
+    fn is_zero(&self) -> bool {
+        self.0.is_zero()
+    }
+
+    fn inverse(mut self) -> Option<Self> {
+        if self.is_zero() {
+            None
+        } else {
+            self.0.invert(&Self::modulus());
+            Some(self)
+        }
+    }
+}
+
+impl Add for Fq {
+    type Output = Fq;
+
+    #[inline]
+    fn add(mut self, other: Fq) -> Fq {
+        #[cfg(all(target_os = "zkvm", target_vendor = "succinct"))]
+        {
+            unsafe {
+                let mut lhs = transmute::<[u128; 2], [u32; 8]>(self.0 .0);
+                let rhs = transmute::<&[u128; 2], &[u32; 8]>(&(other.0 .0));
+                sp1_lib::syscall_bn254_fp_addmod(lhs.as_mut_ptr(), rhs.as_ptr());
+                Self(U256::from(transmute::<[u32; 8], [u64; 4]>(lhs)))
+            }
+        }
+        #[cfg(not(all(target_os = "zkvm", target_vendor = "succinct")))]
+        {
+            self.0.add(&other.0, &Self::modulus());
+
+            self
+        }
+    }
+}
+
+impl Sub for Fq {
+    type Output = Fq;
+
+    #[inline]
+    fn sub(mut self, other: Fq) -> Fq {
+        #[cfg(all(target_os = "zkvm", target_vendor = "succinct"))]
+        {
+            unsafe {
+                let mut lhs = transmute::<[u128; 2], [u32; 8]>(self.0 .0);
+                let rhs = transmute::<&[u128; 2], &[u32; 8]>(&(other.0 .0));
+                sp1_lib::syscall_bn254_fp_submod(lhs.as_mut_ptr(), rhs.as_ptr());
+                Self(U256::from(transmute::<[u32; 8], [u64; 4]>(lhs)))
+            }
+        }
+        #[cfg(not(all(target_os = "zkvm", target_vendor = "succinct")))]
+        {
+            self.0.sub(&other.0, &Self::modulus());
+
+            self
+        }
+    }
+}
+
+impl Mul for Fq {
+    type Output = Fq;
+
+    #[inline]
+    fn mul(mut self, other: Fq) -> Fq {
+        #[cfg(all(target_os = "zkvm", target_vendor = "succinct"))]
+        {
+            unsafe {
+                let mut lhs = transmute::<[u128; 2], [u32; 8]>(self.0 .0);
+                let rhs = transmute::<&[u128; 2], &[u32; 8]>(&(other.0 .0));
+                sp1_lib::syscall_bn254_fp_mulmod(lhs.as_mut_ptr(), rhs.as_ptr());
+                Self(U256::from(transmute::<[u32; 8], [u64; 4]>(lhs)))
+            }
+        }
+        #[cfg(not(all(target_os = "zkvm", target_vendor = "succinct")))]
+        {
+            self.0.mul(&other.0, &Self::modulus());
+
+            self
+        }
+    }
+}
+
+impl Neg for Fq {
+    type Output = Fq;
+
+    #[inline]
+    fn neg(mut self) -> Fq {
+        self.0.neg(&Self::modulus());
+
+        self
+    }
+}
 
 lazy_static::lazy_static! {
 

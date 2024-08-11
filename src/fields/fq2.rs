@@ -3,6 +3,9 @@ use crate::fields::{const_fq, FieldElement, Fq};
 use core::ops::{Add, Mul, Neg, Sub};
 use rand::Rng;
 
+#[cfg(all(target_os = "zkvm", target_vendor = "succinct"))]
+use core::mem::transmute;
+
 #[inline]
 fn fq_non_residue() -> Fq {
     // (q - 1) is a quadratic nonresidue in Fq
@@ -122,16 +125,28 @@ impl Mul for Fq2 {
     type Output = Fq2;
 
     fn mul(self, other: Fq2) -> Fq2 {
-        // Devegili OhEig Scott Dahab
-        //     Multiplication and Squaring on Pairing-Friendly Fields.pdf
-        //     Section 3 (Karatsuba)
+        #[cfg(all(target_os = "zkvm", target_vendor = "succinct"))]
+        {
+            unsafe {
+                let mut lhs = transmute::<Fq2, [u32; 16]>(self);
+                let rhs = transmute::<&Fq2, &[u32; 16]>(&other);
+                sp1_lib::syscall_bn254_fp2_mulmod(lhs.as_mut_ptr(), rhs.as_ptr());
+                transmute::<[u32; 16], Fq2>(lhs)
+            }
+        }
+        #[cfg(not(all(target_os = "zkvm", target_vendor = "succinct")))]
+        {
+            // Devegili OhEig Scott Dahab
+            //     Multiplication and Squaring on Pairing-Friendly Fields.pdf
+            //     Section 3 (Karatsuba)
 
-        let aa = self.c0 * other.c0;
-        let bb = self.c1 * other.c1;
+            let aa = self.c0 * other.c0;
+            let bb = self.c1 * other.c1;
 
-        Fq2 {
-            c0: bb * fq_non_residue() + aa,
-            c1: (self.c0 + self.c1) * (other.c0 + other.c1) - aa - bb,
+            Fq2 {
+                c0: bb * fq_non_residue() + aa,
+                c1: (self.c0 + self.c1) * (other.c0 + other.c1) - aa - bb,
+            }
         }
     }
 }
