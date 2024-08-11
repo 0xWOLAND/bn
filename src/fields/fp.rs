@@ -4,8 +4,13 @@ use alloc::vec::Vec;
 use core::ops::{Add, Mul, Neg, Sub};
 use rand::Rng;
 
-#[cfg(all(target_os = "zkvm", target_vendor = "succinct"))]
-use core::mem::transmute;
+cfg_if::cfg_if! {
+    if #[cfg(all(target_os = "zkvm", target_vendor = "succinct"))] {
+        use core::mem::transmute;
+        use sp1_lib::io::hint_slice;
+        use std::convert::TryInto;
+    }
+}
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 #[repr(C)]
@@ -365,12 +370,34 @@ impl FieldElement for Fq {
         self.0.is_zero()
     }
 
-    fn inverse(mut self) -> Option<Self> {
-        if self.is_zero() {
-            None
-        } else {
-            self.0.invert(&Self::modulus());
-            Some(self)
+    fn inverse(self) -> Option<Self> {
+        fn _inverse(f: &Fq) -> Option<Fq> {
+            if f.is_zero() {
+                None
+            } else {
+                let mut inv = *f;
+                inv.0.invert(&Fq::modulus());
+                Some(inv)
+            }
+        }
+
+        #[cfg(all(target_os = "zkvm", target_vendor = "succinct"))]
+        {
+            sp1_lib::unconstrained! {
+                let mut buf = [0u8; 32];
+                let bytes = unsafe { transmute::<[u128; 2], [u8; 32]>(_inverse(&self).unwrap().0.0) };
+                buf.copy_from_slice(bytes.as_slice());
+                hint_slice(&buf);
+            }
+
+            let bytes: [u8; 32] = sp1_lib::io::read_vec().try_into().unwrap();
+            let inv = unsafe { Fq(U256(transmute::<[u8; 32], [u128; 2]>(bytes))) };
+            Some(inv).filter(|inv| !self.is_zero() && self * *inv == Fq::one())
+        }
+
+        #[cfg(not(all(target_os = "zkvm", target_vendor = "succinct")))]
+        {
+            _inverse(&self)
         }
     }
 }
@@ -449,9 +476,21 @@ impl Neg for Fq {
 
     #[inline]
     fn neg(mut self) -> Fq {
-        self.0.neg(&Self::modulus());
+        #[cfg(all(target_os = "zkvm", target_vendor = "succinct"))]
+        {
+            unsafe {
+                let mut lhs = transmute::<[u128; 2], [u32; 8]>(Self::modulus().0);
+                let rhs = transmute::<&[u128; 2], &[u32; 8]>(&(self.0 .0));
+                sp1_lib::syscall_bn254_fp_submod(lhs.as_mut_ptr(), rhs.as_ptr());
+                Self(U256::from(transmute::<[u32; 8], [u64; 4]>(lhs)))
+            }
+        }
+        #[cfg(not(all(target_os = "zkvm", target_vendor = "succinct")))]
+        {
+            self.0.neg(&Self::modulus());
 
-        self
+            self
+        }
     }
 }
 
@@ -478,17 +517,37 @@ lazy_static::lazy_static! {
 
 impl Fq {
     pub fn sqrt(&self) -> Option<Self> {
-        let a1 = self.pow(*FQ_MINUS3_DIV4);
-        let a1a = a1 * *self;
-        let a0 = a1 * (a1a);
+        fn _sqrt(f: &Fq) -> Option<Fq> {
+            let a1 = f.pow(*FQ_MINUS3_DIV4);
+            let a1a = a1 * *f;
+            let a0 = a1 * (a1a);
 
-        let mut am1 = *FQ;
-        am1.sub(&1.into(), &*FQ);
+            let mut am1 = *FQ;
+            am1.sub(&1.into(), &*FQ);
 
-        if a0 == Fq::new(am1).unwrap() {
-            None
-        } else {
-            Some(a1a)
+            if a0 == Fq::new(am1).unwrap() {
+                None
+            } else {
+                Some(a1a)
+            }
+        }
+
+        #[cfg(all(target_os = "zkvm", target_vendor = "succinct"))]
+        {
+            sp1_lib::unconstrained! {
+                let mut buf = [0u8; 32];
+                let bytes = unsafe {transmute::<[u128; 2], [u8; 32]>(_sqrt(self).unwrap().0.0)};
+                buf.copy_from_slice(bytes.as_slice());
+                hint_slice(&buf);
+            }
+
+            let bytes: [u8; 32] = sp1_lib::io::read_vec().try_into().unwrap();
+            let inv = unsafe { Fq(U256(transmute::<[u8; 32], [u128; 2]>(bytes))) };
+            Some(inv).filter(|inv| !self.is_zero() && *self * *inv == Fq::one())
+        }
+        #[cfg(not(all(target_os = "zkvm", target_vendor = "succinct")))]
+        {
+            _sqrt(self)
         }
     }
 }

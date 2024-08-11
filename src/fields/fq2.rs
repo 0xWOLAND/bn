@@ -155,10 +155,22 @@ impl Sub for Fq2 {
     type Output = Fq2;
 
     fn sub(self, other: Fq2) -> Fq2 {
+        // #[cfg(all(target_os = "zkvm", target_vendor = "succinct"))]
+        // {
+        //     unsafe {
+        //         let mut lhs = transmute::<Fq2, [u32; 16]>(self);
+        //         let rhs = transmute::<&Fq2, &[u32; 16]>(&other);
+        //         sp1_lib::syscall_bn254_fp2_submod(lhs.as_mut_ptr(), rhs.as_ptr());
+        //         transmute::<[u32; 16], Fq2>(lhs)
+        //     }
+        // }
+        // #[cfg(not(all(target_os = "zkvm", target_vendor = "succinct")))]
+        // {
         Fq2 {
             c0: self.c0 - other.c0,
             c1: self.c1 - other.c1,
         }
+        // }
     }
 }
 
@@ -166,10 +178,22 @@ impl Add for Fq2 {
     type Output = Fq2;
 
     fn add(self, other: Fq2) -> Fq2 {
+        // #[cfg(all(target_os = "zkvm", target_vendor = "succinct"))]
+        // {
+        //     unsafe {
+        //         let mut lhs = transmute::<Fq2, [u32; 16]>(self);
+        //         let rhs = transmute::<&Fq2, &[u32; 16]>(&other);
+        //         sp1_lib::syscall_bn254_fp2_addmod(lhs.as_mut_ptr(), rhs.as_ptr());
+        //         transmute::<[u32; 16], Fq2>(lhs)
+        //     }
+        // }
+        // #[cfg(not(all(target_os = "zkvm", target_vendor = "succinct")))]
+        // {
         Fq2 {
             c0: self.c0 + other.c0,
             c1: self.c1 + other.c1,
         }
+        // }
     }
 }
 
