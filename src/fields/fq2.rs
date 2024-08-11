@@ -3,8 +3,13 @@ use crate::fields::{const_fq, FieldElement, Fq};
 use core::ops::{Add, Mul, Neg, Sub};
 use rand::Rng;
 
-#[cfg(all(target_os = "zkvm", target_vendor = "succinct"))]
-use core::mem::transmute;
+cfg_if::cfg_if! {
+    if #[cfg(all(target_os = "zkvm", target_vendor = "succinct"))] {
+        use core::mem::transmute;
+        use sp1_lib::io::hint_slice;
+        use std::convert::TryInto;
+    }
+}
 
 #[inline]
 fn fq_non_residue() -> Fq {
@@ -97,15 +102,21 @@ impl FieldElement for Fq2 {
         //     Multiplication and Squaring on Pairing-Friendly Fields.pdf
         //     Section 3 (Complex squaring)
 
-        let ab = self.c0 * self.c1;
-
-        Fq2 {
-            c0: (self.c1 * fq_non_residue() + self.c0) * (self.c0 + self.c1)
-                - ab
-                - ab * fq_non_residue(),
-            c1: ab + ab,
-        }
+        *self * *self
     }
+
+    // fn inverse(self) -> Option<Self> {
+    //     // "High-Speed Software Implementation of the Optimal Ate Pairing
+    //     // over Barreto–Naehrig Curves"; Algorithm 8
+
+    //     match (self.c0.squared() - (self.c1.squared() * fq_non_residue())).inverse() {
+    //         Some(t) => Some(Fq2 {
+    //             c0: self.c0 * t,
+    //             c1: -(self.c1 * t),
+    //         }),
+    //         None => None,
+    //     }
+    // }
 
     fn inverse(self) -> Option<Self> {
         // "High-Speed Software Implementation of the Optimal Ate Pairing
@@ -117,6 +128,27 @@ impl FieldElement for Fq2 {
                 c1: -(self.c1 * t),
             }),
             None => None,
+        }
+    }
+
+    fn inverse_unconstrained(self) -> Option<Self> {
+        #[cfg(all(target_os = "zkvm", target_vendor = "succinct"))]
+        {
+            sp1_lib::unconstrained! {
+                let mut buf = [0u8; 64];
+                let bytes = unsafe { transmute::<[u128; 4], [u8; 64]>(self.inverse().unwrap().to_u512().0) };
+                buf.copy_from_slice(bytes.as_slice());
+                hint_slice(&buf);
+            }
+
+            let bytes: [u8; 64] = sp1_lib::io::read_vec().try_into().unwrap();
+            let inv = unsafe { transmute::<[u8; 64], Fq2>(bytes) };
+            Some(inv).filter(|inv| !self.is_zero() && self * *inv == Fq2::one())
+        }
+
+        #[cfg(not(all(target_os = "zkvm", target_vendor = "succinct")))]
+        {
+            self.inverse()
         }
     }
 }

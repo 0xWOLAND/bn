@@ -3,6 +3,14 @@ use crate::fields::{const_fq, FieldElement, Fq, Fq2, Fq6};
 use core::ops::{Add, Mul, Neg, Sub};
 use rand::Rng;
 
+cfg_if::cfg_if! {
+    if #[cfg(all(target_os = "zkvm", target_vendor = "succinct"))] {
+        use core::mem::transmute;
+        use sp1_lib::io::hint_slice;
+        use std::convert::TryInto;
+    }
+}
+
 fn frobenius_coeffs_c1(power: usize) -> Fq2 {
     match power % 12 {
         0 => Fq2::one(),
@@ -311,6 +319,28 @@ impl FieldElement for Fq12 {
                 c1: -(self.c1 * t),
             }),
             None => None,
+        }
+    }
+
+    fn inverse_unconstrained(self) -> Option<Self> {
+        #[cfg(all(target_os = "zkvm", target_vendor = "succinct"))]
+        {
+            // sp1_lib::unconstrained! {
+            //     let mut buf = [0u8; 384];
+            //     let bytes = unsafe { transmute::<Fq12, [u8; 384]>(self.inverse().unwrap()) };
+            //     buf.copy_from_slice(bytes.as_slice());
+            //     hint_slice(&buf);
+            // }
+
+            // let bytes: [u8; 384] = sp1_lib::io::read_vec().try_into().unwrap();
+            // let inv = unsafe { transmute::<[u8; 384], Fq12>(bytes) };
+            // Some(inv).filter(|inv| !self.is_zero() && self * *inv == Fq12::one())
+            self.inverse()
+        }
+
+        #[cfg(not(all(target_os = "zkvm", target_vendor = "succinct")))]
+        {
+            self.inverse()
         }
     }
 }
