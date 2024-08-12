@@ -68,7 +68,7 @@ impl Fq12 {
     }
 
     fn final_exponentiation_first_chunk(&self) -> Option<Fq12> {
-        match self.inverse() {
+        match self.inverse_unconstrained() {
             Some(b) => {
                 let a = self.unitary_inverse();
                 let c = a * b;
@@ -325,17 +325,17 @@ impl FieldElement for Fq12 {
     fn inverse_unconstrained(self) -> Option<Self> {
         #[cfg(all(target_os = "zkvm", target_vendor = "succinct"))]
         {
-            // sp1_lib::unconstrained! {
-            //     let mut buf = [0u8; 384];
-            //     let bytes = unsafe { transmute::<Fq12, [u8; 384]>(self.inverse().unwrap()) };
-            //     buf.copy_from_slice(bytes.as_slice());
-            //     hint_slice(&buf);
-            // }
+            sp1_lib::unconstrained! {
+                let mut buf = [0u8; 384];
+                let bytes = unsafe { transmute::<Fq12, [u8; 384]>(self.inverse().unwrap()) };
+                buf.copy_from_slice(bytes.as_slice());
+                hint_slice(&buf);
+            }
 
-            // let bytes: [u8; 384] = sp1_lib::io::read_vec().try_into().unwrap();
-            // let inv = unsafe { transmute::<[u8; 384], Fq12>(bytes) };
-            // Some(inv).filter(|inv| !self.is_zero() && self * *inv == Fq12::one())
-            self.inverse()
+            let bytes: [u8; 384] = sp1_lib::io::read_vec().try_into().unwrap();
+            let inv = unsafe { transmute::<[u8; 384], Fq12>(bytes) };
+            Some(inv).filter(|inv| !self.is_zero() && self * *inv == Fq12::one())
+            // self.inverse()
         }
 
         #[cfg(not(all(target_os = "zkvm", target_vendor = "succinct")))]

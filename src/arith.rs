@@ -2,7 +2,7 @@ use core::cmp::Ordering;
 use crunchy::unroll;
 use rand::Rng;
 
-use byteorder::{BigEndian, ByteOrder};
+use byteorder::{BigEndian, ByteOrder, LittleEndian};
 
 /// 256-bit, stack allocated biginteger for use in prime field
 /// arithmetic.
@@ -227,6 +227,20 @@ impl U256 {
             BigEndian::write_u128(&mut s[i..], self.0[l]);
         }
 
+        Ok(())
+    }
+
+    pub fn to_little_endian(&self, s: &mut [u8]) -> Result<(), Error> {
+        if s.len() != 32 {
+            return Err(Error::InvalidLength {
+                expected: 32,
+                actual: s.len(),
+            });
+        }
+
+        for (l, i) in (0..2).zip((0..2).map(|i| i * 16)) {
+            LittleEndian::write_u128(&mut s[i..], self.0[l]);
+        }
         Ok(())
     }
 

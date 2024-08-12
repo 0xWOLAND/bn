@@ -34,7 +34,7 @@ impl Fr {
         fields::Fr::from_str(s).map(|e| Fr(e))
     }
     pub fn inverse(&self) -> Option<Self> {
-        self.0.inverse().map(|e| Fr(e))
+        self.0.inverse_unconstrained().map(|e| Fr(e))
     }
     pub fn is_zero(&self) -> bool {
         self.0.is_zero()
@@ -144,7 +144,7 @@ impl Fq {
         fields::Fq::from_str(s).map(|e| Fq(e))
     }
     pub fn inverse(&self) -> Option<Self> {
-        self.0.inverse().map(|e| Fq(e))
+        self.0.inverse_unconstrained().map(|e| Fq(e))
     }
     pub fn is_zero(&self) -> bool {
         self.0.is_zero()
@@ -163,6 +163,13 @@ impl Fq {
         a.to_big_endian(slice)
             .map_err(|_| FieldError::InvalidSliceLength)
     }
+
+    pub fn to_litle_endian(&self, slice: &mut [u8]) -> Result<(), FieldError> {
+        let a: arith::U256 = self.0.into();
+        a.to_little_endian(slice)
+            .map_err(|_| FieldError::InvalidSliceLength)
+    }
+
     pub fn from_u256(u256: arith::U256) -> Result<Self, FieldError> {
         Ok(Fq(fields::Fq::new(u256).ok_or(FieldError::NotMember)?))
     }
@@ -607,7 +614,7 @@ impl Gt {
         Gt(self.0.pow(exp.0))
     }
     pub fn inverse(&self) -> Option<Self> {
-        self.0.inverse().map(Gt)
+        self.0.inverse_unconstrained().map(Gt)
     }
     pub fn final_exponentiation(&self) -> Option<Self> {
         self.0.final_exponentiation().map(Gt)
