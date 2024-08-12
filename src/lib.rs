@@ -125,7 +125,7 @@ pub use crate::groups::Error as GroupError;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 #[repr(C)]
-pub struct Fq(fields::Fq);
+pub struct Fq(pub fields::Fq);
 
 impl Fq {
     pub fn zero() -> Self {
@@ -212,7 +212,7 @@ impl Mul for Fq {
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 #[repr(C)]
-pub struct Fq2(fields::Fq2);
+pub struct Fq2(pub fields::Fq2);
 
 impl Fq2 {
     pub fn one() -> Fq2 {

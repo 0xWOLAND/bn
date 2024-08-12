@@ -241,7 +241,7 @@ impl Neg for Fr {
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 #[repr(C)]
-pub struct Fq(U256);
+pub struct Fq(pub U256);
 
 impl From<Fq> for U256 {
     #[inline]
@@ -500,7 +500,7 @@ impl Neg for Fq {
         #[cfg(all(target_os = "zkvm", target_vendor = "succinct"))]
         {
             unsafe {
-                let mut lhs = transmute::<[u128; 2], [u32; 8]>(Self::modulus().0);
+                let mut lhs = [0u32; 8];
                 let rhs = transmute::<&[u128; 2], &[u32; 8]>(&(self.0 .0));
                 sp1_lib::syscall_bn254_fp_submod(lhs.as_mut_ptr(), rhs.as_ptr());
                 Self(U256::from(transmute::<[u32; 8], [u64; 4]>(lhs)))
