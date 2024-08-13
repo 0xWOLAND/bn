@@ -1,13 +1,12 @@
 use crate::arith::{U256, U512};
 use crate::fields::FieldElement;
 use alloc::vec::Vec;
-use bytemuck::cast;
 use core::ops::{Add, Mul, Neg, Sub};
-use rand::{thread_rng, Rng};
+use rand::Rng;
 
 cfg_if::cfg_if! {
-    if #[cfg(all(target_os = "zkvm", target_vendor = "succinct"))] {
-        use bytemuck::cast_slice;
+    if #[cfg(all(target_os = "zkvm"))] {
+        use bytemuck::cast;
         use core::mem::transmute;
         use sp1_lib::io::hint_slice;
         use std::convert::TryInto;
@@ -176,21 +175,21 @@ impl FieldElement for Fr {
     }
 
     fn inverse_unconstrained(self) -> Option<Self> {
-        #[cfg(all(target_os = "zkvm", target_vendor = "succinct"))]
-        {
-            sp1_lib::unconstrained! {
-                let mut buf = [0u8; 32];
-                let bytes = unsafe { transmute::<[u128; 2], [u8; 32]>(self.inverse().unwrap().0.0) };
-                buf.copy_from_slice(bytes.as_slice());
-                hint_slice(&buf);
-            }
+        // #[cfg(all(target_os = "zkvm"))]
+        // {
+        //     sp1_lib::unconstrained! {
+        //         let mut buf = [0u8; 32];
+        //         let bytes = unsafe { transmute::<[u128; 2], [u8; 32]>(self.inverse().unwrap().0.0) };
+        //         buf.copy_from_slice(bytes.as_slice());
+        //         hint_slice(&buf);
+        //     }
 
-            let bytes: [u8; 32] = sp1_lib::io::read_vec().try_into().unwrap();
-            let inv = unsafe { Fr(U256(transmute::<[u8; 32], [u128; 2]>(bytes))) };
-            Some(inv).filter(|inv| !self.is_zero() && self * *inv == Fr::one())
-        }
+        //     let bytes: [u8; 32] = sp1_lib::io::read_vec().try_into().unwrap();
+        //     let inv = unsafe { Fr(U256(transmute::<[u8; 32], [u128; 2]>(bytes))) };
+        //     Some(inv).filter(|inv| !self.is_zero() && self * *inv == Fr::one())
+        // }
 
-        #[cfg(not(all(target_os = "zkvm", target_vendor = "succinct")))]
+        // #[cfg(not(all(target_os = "zkvm")))]
         {
             self.inverse()
         }
@@ -419,7 +418,7 @@ impl FieldElement for Fq {
     }
 
     fn inverse_unconstrained(self) -> Option<Self> {
-        #[cfg(all(target_os = "zkvm", target_vendor = "succinct"))]
+        #[cfg(all(target_os = "zkvm"))]
         {
             sp1_lib::unconstrained! {
                 let mut buf = [0u8; 32];
@@ -433,7 +432,7 @@ impl FieldElement for Fq {
             Some(inv).filter(|inv| !self.is_zero() && self * *inv == Fq::one())
         }
 
-        #[cfg(not(all(target_os = "zkvm", target_vendor = "succinct")))]
+        #[cfg(not(all(target_os = "zkvm")))]
         {
             self.inverse()
         }
@@ -445,39 +444,16 @@ impl Add for Fq {
 
     #[inline]
     fn add(mut self, other: Fq) -> Fq {
-        #[cfg(all(target_os = "zkvm", target_vendor = "succinct"))]
+        #[cfg(all(target_os = "zkvm"))]
         {
             unsafe {
                 let mut lhs = cast::<[u128; 2], [u32; 8]>(self.0 .0);
                 let mut rhs = cast::<[u128; 2], [u32; 8]>(other.0 .0);
-                let mut modulus_limbs = cast::<[u128; 2], [u32; 8]>(Fq::modulus().0);
-
-                // lhs.reverse();
-                // rhs.reverse();
-                // modulus_limbs.reverse();
-
-                println!("[ADD] lhs: {:?}", lhs);
-                println!("[ADD] rhs: {:?}", rhs);
-                println!("[ADD] modulus: {:?}", modulus_limbs);
-
-                assert!(
-                    self < Fq(Fq::modulus()),
-                    "lhs: {:?}, modulus: {:?}",
-                    self,
-                    Fq::modulus()
-                );
-                assert!(
-                    other < Fq(Fq::modulus()),
-                    "lhs: {:?}, modulus: {:?}",
-                    self,
-                    Fq::modulus()
-                );
-
                 sp1_lib::syscall_bn254_fp_addmod(lhs.as_mut_ptr(), rhs.as_ptr());
                 Self(U256::from(cast::<[u32; 8], [u64; 4]>(lhs)))
             }
         }
-        #[cfg(not(all(target_os = "zkvm", target_vendor = "succinct")))]
+        #[cfg(not(all(target_os = "zkvm")))]
         {
             self.0.add(&other.0, &Self::modulus());
 
@@ -491,39 +467,17 @@ impl Sub for Fq {
 
     #[inline]
     fn sub(mut self, other: Fq) -> Fq {
-        #[cfg(all(target_os = "zkvm", target_vendor = "succinct"))]
+        #[cfg(all(target_os = "zkvm"))]
         {
             unsafe {
                 let mut lhs = cast::<[u128; 2], [u32; 8]>(self.0 .0);
                 let mut rhs = cast::<[u128; 2], [u32; 8]>(other.0 .0);
                 let mut modulus_limbs = cast::<[u128; 2], [u32; 8]>(Fq::modulus().0);
-
-                // lhs.reverse();
-                // rhs.reverse();
-                // modulus_limbs.reverse();
-
-                println!("[SUB] lhs: {:?}", lhs);
-                println!("[SUB] rhs: {:?}", rhs);
-                println!("[SUB] modulus: {:?}", modulus_limbs);
-
-                assert!(
-                    self < Fq(Fq::modulus()),
-                    "lhs: {:?}, modulus: {:?}",
-                    self,
-                    Fq::modulus()
-                );
-                assert!(
-                    other < Fq(Fq::modulus()),
-                    "lhs: {:?}, modulus: {:?}",
-                    self,
-                    Fq::modulus()
-                );
-
                 sp1_lib::syscall_bn254_fp_submod(lhs.as_mut_ptr(), rhs.as_ptr());
                 Self(U256::from(cast::<[u32; 8], [u64; 4]>(lhs)))
             }
         }
-        #[cfg(not(all(target_os = "zkvm", target_vendor = "succinct")))]
+        #[cfg(not(all(target_os = "zkvm")))]
         {
             self.0.sub(&other.0, &Self::modulus());
 
@@ -537,31 +491,16 @@ impl Mul for Fq {
 
     #[inline]
     fn mul(mut self, other: Fq) -> Fq {
-        #[cfg(all(target_os = "zkvm", target_vendor = "succinct"))]
+        #[cfg(all(target_os = "zkvm"))]
         {
             unsafe {
                 let mut lhs = cast::<[u128; 2], [u32; 8]>(self.0 .0);
                 let mut rhs = cast::<[u128; 2], [u32; 8]>(other.0 .0);
-                let mut modulus_limbs = cast::<[u128; 2], [u32; 8]>(Fq::modulus().0);
-
-                assert!(
-                    self < Fq(Fq::modulus()),
-                    "lhs: {:?}, modulus: {:?}",
-                    self,
-                    Fq::modulus()
-                );
-                assert!(
-                    other < Fq(Fq::modulus()),
-                    "lhs: {:?}, modulus: {:?}",
-                    self,
-                    Fq::modulus()
-                );
-
                 sp1_lib::syscall_bn254_fp_mulmod(lhs.as_mut_ptr(), rhs.as_ptr());
                 Self(U256::from(cast::<[u32; 8], [u64; 4]>(lhs)))
             }
         }
-        #[cfg(not(all(target_os = "zkvm", target_vendor = "succinct")))]
+        #[cfg(not(all(target_os = "zkvm")))]
         {
             self.0.mul(&other.0, &Self::modulus());
 
@@ -575,7 +514,7 @@ impl Neg for Fq {
 
     #[inline]
     fn neg(mut self) -> Fq {
-        #[cfg(all(target_os = "zkvm", target_vendor = "succinct"))]
+        #[cfg(all(target_os = "zkvm"))]
         {
             unsafe {
                 let mut lhs = [0u32; 8];
@@ -584,7 +523,7 @@ impl Neg for Fq {
                 Self(U256::from(transmute::<[u32; 8], [u64; 4]>(lhs)))
             }
         }
-        #[cfg(not(all(target_os = "zkvm", target_vendor = "succinct")))]
+        #[cfg(not(all(target_os = "zkvm")))]
         {
             self.0.neg(&Self::modulus());
 
@@ -632,7 +571,7 @@ impl Fq {
             }
         }
 
-        #[cfg(all(target_os = "zkvm", target_vendor = "succinct"))]
+        #[cfg(all(target_os = "zkvm"))]
         let out = {
             sp1_lib::unconstrained! {
                 let mut buf = [0u8; 32];
@@ -645,7 +584,7 @@ impl Fq {
             let inv = unsafe { Fq(U256(transmute::<[u8; 32], [u128; 2]>(bytes))) };
             Some(inv).filter(|inv| !self.is_zero() && *self * *inv == Fq::one())
         };
-        #[cfg(not(all(target_os = "zkvm", target_vendor = "succinct")))]
+        #[cfg(not(all(target_os = "zkvm")))]
         let out = { _sqrt(self) };
         println!("cycle-tracker-end: sqrt");
         out

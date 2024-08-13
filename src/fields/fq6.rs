@@ -3,7 +3,7 @@ use core::ops::{Add, Mul, Neg, Sub};
 use rand::Rng;
 
 cfg_if::cfg_if! {
-    if #[cfg(all(target_os = "zkvm", target_vendor = "succinct"))] {
+    if #[cfg(all(target_os = "zkvm"))] {
         use core::mem::transmute;
         use sp1_lib::io::hint_slice;
         use std::convert::TryInto;
@@ -199,21 +199,21 @@ impl FieldElement for Fq6 {
     }
 
     fn inverse_unconstrained(self) -> Option<Self> {
-        #[cfg(all(target_os = "zkvm", target_vendor = "succinct"))]
-        {
-            sp1_lib::unconstrained! {
-                let mut buf = [0u8; 192];
-                let bytes = unsafe { transmute::<Fq6, [u8; 192]>(self.inverse().unwrap()) };
-                buf.copy_from_slice(bytes.as_slice());
-                hint_slice(&buf);
-            }
+        // #[cfg(all(target_os = "zkvm"))]
+        // {
+        //     sp1_lib::unconstrained! {
+        //         let mut buf = [0u8; 192];
+        //         let bytes = unsafe { transmute::<Fq6, [u8; 192]>(self.inverse().unwrap()) };
+        //         buf.copy_from_slice(bytes.as_slice());
+        //         hint_slice(&buf);
+        //     }
 
-            let bytes: [u8; 192] = sp1_lib::io::read_vec().try_into().unwrap();
-            let inv = unsafe { transmute::<[u8; 192], Fq6>(bytes) };
-            Some(inv).filter(|inv| !self.is_zero() && self * *inv == Fq6::one())
-        }
+        //     let bytes: [u8; 192] = sp1_lib::io::read_vec().try_into().unwrap();
+        //     let inv = unsafe { transmute::<[u8; 192], Fq6>(bytes) };
+        //     Some(inv).filter(|inv| !self.is_zero() && self * *inv == Fq6::one())
+        // }
 
-        #[cfg(not(all(target_os = "zkvm", target_vendor = "succinct")))]
+        // #[cfg(not(all(target_os = "zkvm")))]
         {
             self.inverse()
         }

@@ -4,7 +4,7 @@ use core::ops::{Add, Mul, Neg, Sub};
 use rand::Rng;
 
 cfg_if::cfg_if! {
-    if #[cfg(all(target_os = "zkvm", target_vendor = "succinct"))] {
+    if #[cfg(all(target_os = "zkvm"))] {
         use core::mem::transmute;
         use sp1_lib::io::hint_slice;
         use std::convert::TryInto;
@@ -132,21 +132,21 @@ impl FieldElement for Fq2 {
     }
 
     fn inverse_unconstrained(self) -> Option<Self> {
-        #[cfg(all(target_os = "zkvm", target_vendor = "succinct"))]
-        {
-            sp1_lib::unconstrained! {
-                let mut buf = [0u8; 64];
-                let bytes = unsafe { transmute::<[u128; 4], [u8; 64]>(self.inverse().unwrap().to_u512().0) };
-                buf.copy_from_slice(bytes.as_slice());
-                hint_slice(&buf);
-            }
+        // #[cfg(all(target_os = "zkvm"))]
+        // {
+        //     sp1_lib::unconstrained! {
+        //         let mut buf = [0u8; 64];
+        //         let bytes = unsafe { transmute::<[u128; 4], [u8; 64]>(self.inverse().unwrap().to_u512().0) };
+        //         buf.copy_from_slice(bytes.as_slice());
+        //         hint_slice(&buf);
+        //     }
 
-            let bytes: [u8; 64] = sp1_lib::io::read_vec().try_into().unwrap();
-            let inv = unsafe { transmute::<[u8; 64], Fq2>(bytes) };
-            Some(inv).filter(|inv| !self.is_zero() && self * *inv == Fq2::one())
-        }
+        //     let bytes: [u8; 64] = sp1_lib::io::read_vec().try_into().unwrap();
+        //     let inv = unsafe { transmute::<[u8; 64], Fq2>(bytes) };
+        //     Some(inv).filter(|inv| !self.is_zero() && self * *inv == Fq2::one())
+        // }
 
-        #[cfg(not(all(target_os = "zkvm", target_vendor = "succinct")))]
+        // #[cfg(not(all(target_os = "zkvm")))]
         {
             self.inverse()
         }
@@ -157,7 +157,7 @@ impl Mul for Fq2 {
     type Output = Fq2;
 
     fn mul(self, other: Fq2) -> Fq2 {
-        #[cfg(all(target_os = "zkvm", target_vendor = "succinct"))]
+        #[cfg(all(target_os = "zkvm"))]
         {
             unsafe {
                 let mut lhs = transmute::<Fq2, [u32; 16]>(self);
@@ -166,7 +166,7 @@ impl Mul for Fq2 {
                 transmute::<[u32; 16], Fq2>(lhs)
             }
         }
-        #[cfg(not(all(target_os = "zkvm", target_vendor = "succinct")))]
+        #[cfg(not(all(target_os = "zkvm")))]
         {
             // Devegili OhEig Scott Dahab
             //     Multiplication and Squaring on Pairing-Friendly Fields.pdf
@@ -187,7 +187,7 @@ impl Sub for Fq2 {
     type Output = Fq2;
 
     fn sub(self, other: Fq2) -> Fq2 {
-        // #[cfg(all(target_os = "zkvm", target_vendor = "succinct"))]
+        // #[cfg(all(target_os = "zkvm"))]
         // {
         //     unsafe {
         //         let mut lhs = transmute::<Fq2, [u32; 16]>(self);
@@ -196,7 +196,7 @@ impl Sub for Fq2 {
         //         transmute::<[u32; 16], Fq2>(lhs)
         //     }
         // }
-        // #[cfg(not(all(target_os = "zkvm", target_vendor = "succinct")))]
+        // #[cfg(not(all(target_os = "zkvm")))]
         // {
         Fq2 {
             c0: self.c0 - other.c0,
@@ -210,7 +210,7 @@ impl Add for Fq2 {
     type Output = Fq2;
 
     fn add(self, other: Fq2) -> Fq2 {
-        // #[cfg(all(target_os = "zkvm", target_vendor = "succinct"))]
+        // #[cfg(all(target_os = "zkvm"))]
         // {
         //     unsafe {
         //         let mut lhs = transmute::<Fq2, [u32; 16]>(self);
@@ -219,7 +219,7 @@ impl Add for Fq2 {
         //         transmute::<[u32; 16], Fq2>(lhs)
         //     }
         // }
-        // #[cfg(not(all(target_os = "zkvm", target_vendor = "succinct")))]
+        // #[cfg(not(all(target_os = "zkvm")))]
         // {
         Fq2 {
             c0: self.c0 + other.c0,
