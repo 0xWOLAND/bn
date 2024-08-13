@@ -175,21 +175,21 @@ impl FieldElement for Fr {
     }
 
     fn inverse_unconstrained(self) -> Option<Self> {
-        // #[cfg(all(target_os = "zkvm"))]
-        // {
-        //     sp1_lib::unconstrained! {
-        //         let mut buf = [0u8; 32];
-        //         let bytes = unsafe { transmute::<[u128; 2], [u8; 32]>(self.inverse().unwrap().0.0) };
-        //         buf.copy_from_slice(bytes.as_slice());
-        //         hint_slice(&buf);
-        //     }
+        #[cfg(all(target_os = "zkvm"))]
+        {
+            sp1_lib::unconstrained! {
+                let mut buf = [0u8; 32];
+                let bytes = unsafe { transmute::<[u128; 2], [u8; 32]>(self.inverse().unwrap().0.0) };
+                buf.copy_from_slice(bytes.as_slice());
+                hint_slice(&buf);
+            }
 
-        //     let bytes: [u8; 32] = sp1_lib::io::read_vec().try_into().unwrap();
-        //     let inv = unsafe { Fr(U256(transmute::<[u8; 32], [u128; 2]>(bytes))) };
-        //     Some(inv).filter(|inv| !self.is_zero() && self * *inv == Fr::one())
-        // }
+            let bytes: [u8; 32] = sp1_lib::io::read_vec().try_into().unwrap();
+            let inv = unsafe { Fr(U256(transmute::<[u8; 32], [u128; 2]>(bytes))) };
+            Some(inv).filter(|inv| !self.is_zero() && self * *inv == Fr::one())
+        }
 
-        // #[cfg(not(all(target_os = "zkvm")))]
+        #[cfg(not(all(target_os = "zkvm")))]
         {
             self.inverse()
         }
