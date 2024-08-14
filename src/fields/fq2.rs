@@ -69,6 +69,37 @@ impl Fq2 {
     pub fn imaginary(&self) -> &Fq {
         &self.c1
     }
+
+    fn _add(self, other: Fq2) -> Fq2 {
+        Fq2 {
+            c0: self.c0._add(other.c0),
+            c1: self.c1._add(other.c1),
+        }
+    }
+
+    fn _mul(self, other: Fq2) -> Fq2 {
+        // Devegili OhEig Scott Dahab
+        //     Multiplication and Squaring on Pairing-Friendly Fields.pdf
+        //     Section 3 (Karatsuba)
+
+        let aa = self.c0._mul(other.c0);
+        let bb = self.c1._mul(other.c1);
+
+        Fq2 {
+            c0: bb._mul(fq_non_residue())._add(aa),
+            c1: (self.c0._add(self.c1))
+                ._mul(other.c0._add(other.c1))
+                ._sub(aa)
+                ._sub(bb),
+        }
+    }
+
+    fn _neg(self) -> Fq2 {
+        Fq2 {
+            c0: self.c0._neg(),
+            c1: self.c1._neg(),
+        }
+    }
 }
 
 impl FieldElement for Fq2 {
@@ -122,31 +153,46 @@ impl FieldElement for Fq2 {
         // "High-Speed Software Implementation of the Optimal Ate Pairing
         // over Barreto–Naehrig Curves"; Algorithm 8
 
-        match (self.c0.squared() - (self.c1.squared() * fq_non_residue())).inverse() {
+        // match (self.c0.squared() - (self.c1.squared() * fq_non_residue())).inverse() {
+        match (self
+            .c0
+            ._mul(self.c0)
+            ._sub((self.c1._mul(self.c1))._mul(fq_non_residue())))
+        .inverse()
+        {
             Some(t) => Some(Fq2 {
-                c0: self.c0 * t,
-                c1: -(self.c1 * t),
+                c0: self.c0._mul(t),
+                c1: (self.c1._mul(t))._neg(),
             }),
             None => None,
         }
     }
 
     fn inverse_unconstrained(self) -> Option<Self> {
-        // #[cfg(all(target_os = "zkvm"))]
-        // {
-        //     sp1_lib::unconstrained! {
-        //         let mut buf = [0u8; 64];
-        //         let bytes = unsafe { transmute::<[u128; 4], [u8; 64]>(self.inverse().unwrap().to_u512().0) };
-        //         buf.copy_from_slice(bytes.as_slice());
-        //         hint_slice(&buf);
-        //     }
-
-        //     let bytes: [u8; 64] = sp1_lib::io::read_vec().try_into().unwrap();
-        //     let inv = unsafe { transmute::<[u8; 64], Fq2>(bytes) };
-        //     Some(inv).filter(|inv| !self.is_zero() && self * *inv == Fq2::one())
-        // }
-
-        // #[cfg(not(all(target_os = "zkvm")))]
+        #[cfg(target_os = "zkvm")]
+        {
+            // Compute the inverse using the zkvm syscall
+            unconstrained! {
+                let mut buf = [0u8; 65];
+                self.inverse().map(|inv| {
+                    let bytes = unsafe { transmute::<[u128; 4], [u8; 64]>(inv.to_u512().0) };
+                    buf[0..64].copy_from_slice(&bytes);
+                    buf[64] = 1;
+                });
+                hint_slice(&buf);
+            }
+            let byte_vec = read_vec();
+            let bytes: [u8; 65] = byte_vec.try_into().unwrap();
+            match bytes[64] {
+                0 => None,
+                _ => {
+                    let inv =
+                        unsafe { transmute::<[u8; 64], Fq2>(bytes[0..64].try_into().unwrap()) };
+                    Some(inv).filter(|inv| !self.is_zero() && self * inv == Fq2::one())
+                }
+            }
+        }
+        #[cfg(not(target_os = "zkvm"))]
         {
             self.inverse()
         }
@@ -266,19 +312,48 @@ impl Fq2 {
 
     pub fn sqrt(&self) -> Option<Self> {
         let a1 = self.pow::<U256>((*FQ_MINUS3_DIV4).into());
-        let a1a = a1 * *self;
-        let alpha = a1 * a1a;
-        let a0 = alpha.pow(*FQ) * alpha;
+        let a1a = a1._mul(*self);
+        let alpha = a1._mul(a1a);
+        let a0 = alpha.pow(*FQ)._mul(alpha);
 
-        if a0 == Fq2::one().neg() {
+        if a0 == Fq2::one()._neg() {
             return None;
         }
 
-        if alpha == Fq2::one().neg() {
-            Some(Self::i() * a1a)
+        if alpha == Fq2::one()._neg() {
+            Some(Self::i()._mul(a1a))
         } else {
-            let b = (alpha + Fq2::one()).pow::<U256>((*FQ_MINUS1_DIV2).into());
-            Some(b * a1a)
+            let b = (alpha._add(Fq2::one())).pow::<U256>((*FQ_MINUS1_DIV2).into());
+            Some(b._mul(a1a))
+        }
+    }
+
+    fn sqrt_unconstrained(&self) -> Option<Self> {
+        #[cfg(target_os = "zkvm")]
+        {
+            // Compute the square root using the zkvm syscall
+            unconstrained! {
+                let mut buf = [0u8; 65];
+                self.sqrt().map(|sqrt| {
+                    let bytes = unsafe { transmute::<[u128; 4], [u8; 64]>(sqrt.to_u512().0) };
+                    buf[0..64].copy_from_slice(&bytes);
+                    buf[64] = 1;
+                });
+                hint_slice(&buf);
+            }
+            let byte_vec = read_vec();
+            let bytes: [u8; 65] = byte_vec.try_into().unwrap();
+            match bytes[64] {
+                0 => None,
+                _ => {
+                    let sqrt = unsafe { transmute::<[u8; 64], Fq2>(bytes[0..64].try_into().unwrap()) };
+                    Some(sqrt).filter(|sqrt| sqrt * sqrt == *self)
+                }
+            }
+        }
+        #[cfg(not(target_os = "zkvm"))]
+        {
+            self.sqrt()
         }
     }
 
