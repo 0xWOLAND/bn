@@ -8,7 +8,7 @@ cfg_if::cfg_if! {
     if #[cfg(all(target_os = "zkvm"))] {
         use bytemuck::cast;
         use core::mem::transmute;
-        use sp1_lib::io::hint_slice;
+        use sp1_lib::io::{hint_slice, read_vec};
         use std::convert::TryInto;
     }
 }
@@ -178,7 +178,7 @@ impl FieldElement for Fr {
         #[cfg(all(target_os = "zkvm"))]
         {
             sp1_lib::unconstrained! {
-                let mut buf = [0u8; 32];
+                let mut buf = [0u8; 33];
                 let bytes = unsafe { transmute::<[u128; 2], [u8; 32]>(self.inverse().unwrap().0.0) };
                 buf.copy_from_slice(bytes.as_slice());
                 hint_slice(&buf);
@@ -385,6 +385,26 @@ impl Fq {
     pub fn set_bit(&mut self, bit: usize, to: bool) {
         self.0.set_bit(bit, to);
     }
+
+    pub(crate) fn _add(mut self, other: Fq) -> Fq {
+        self.0.add(&other.0, &Self::modulus());
+        self
+    }
+
+    pub(crate) fn _sub(mut self, other: Fq) -> Fq {
+        self.0.sub(&other.0, &Self::modulus());
+        self
+    }
+
+    pub(crate) fn _mul(mut self, other: Fq) -> Fq {
+        self.0.mul(&other.0, &Self::modulus());
+        self
+    }
+
+    pub(crate) fn _neg(mut self) -> Fq {
+        self.0.neg(&Self::modulus());
+        self
+    }
 }
 
 impl FieldElement for Fq {
@@ -455,9 +475,7 @@ impl Add for Fq {
         }
         #[cfg(not(all(target_os = "zkvm")))]
         {
-            self.0.add(&other.0, &Self::modulus());
-
-            self
+            self._add(other)
         }
     }
 }
@@ -479,9 +497,7 @@ impl Sub for Fq {
         }
         #[cfg(not(all(target_os = "zkvm")))]
         {
-            self.0.sub(&other.0, &Self::modulus());
-
-            self
+            self._sub(other)
         }
     }
 }
@@ -525,9 +541,7 @@ impl Neg for Fq {
         }
         #[cfg(not(all(target_os = "zkvm")))]
         {
-            self.0.neg(&Self::modulus());
-
-            self
+            self._neg()
         }
     }
 }
@@ -555,15 +569,12 @@ lazy_static::lazy_static! {
 
 impl Fq {
     pub fn sqrt(&self) -> Option<Self> {
-        println!("cycle-tracker-start: sqrt");
         fn _sqrt(f: &Fq) -> Option<Fq> {
             let a1 = f.pow(*FQ_MINUS3_DIV4);
-            let a1a = a1 * *f;
-            let a0 = a1 * (a1a);
-
+            let a1a = a1._mul(*f);
+            let a0 = a1._mul(a1a);
             let mut am1 = *FQ;
             am1.sub(&1.into(), &*FQ);
-
             if a0 == Fq::new(am1).unwrap() {
                 None
             } else {
@@ -571,23 +582,37 @@ impl Fq {
             }
         }
 
-        #[cfg(all(target_os = "zkvm"))]
-        let out = {
+        #[cfg(target_os = "zkvm")]
+        {
+            // Compute the square root using the zkvm syscall
             sp1_lib::unconstrained! {
-                let mut buf = [0u8; 32];
-                let bytes = unsafe {transmute::<[u128; 2], [u8; 32]>(_sqrt(self).unwrap().0.0)};
-                buf.copy_from_slice(bytes.as_slice());
+                let mut buf = [0u8; 33];
+                _sqrt(self).map(|sqrt| {
+                    let bytes = unsafe { transmute::<[u128; 2], [u8; 32]>(sqrt.0.0) };
+                    buf[0..32].copy_from_slice(&bytes);
+                    buf[32] = 1;
+                });
                 hint_slice(&buf);
             }
+            let byte_vec = read_vec();
+            let bytes: [u8; 33] = byte_vec.try_into().unwrap();
+            match bytes[32] {
+                0 => None,
+                _ => {
+                    let sqrt = unsafe {
+                        Fq(U256(transmute::<[u8; 32], [u128; 2]>(
+                            bytes[0..32].try_into().unwrap(),
+                        )))
+                    };
+                    Some(sqrt).filter(|s| *s * *s == *self)
+                }
+            }
+        }
 
-            let bytes: [u8; 32] = sp1_lib::io::read_vec().try_into().unwrap();
-            let inv = unsafe { Fq(U256(transmute::<[u8; 32], [u128; 2]>(bytes))) };
-            Some(inv).filter(|inv| !self.is_zero() && *self * *inv == Fq::one())
-        };
-        #[cfg(not(all(target_os = "zkvm")))]
-        let out = { _sqrt(self) };
-        println!("cycle-tracker-end: sqrt");
-        out
+        #[cfg(not(target_os = "zkvm"))]
+        {
+            _sqrt(self)
+        }
     }
 }
 

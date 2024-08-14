@@ -164,12 +164,6 @@ impl Fq {
             .map_err(|_| FieldError::InvalidSliceLength)
     }
 
-    pub fn to_litle_endian(&self, slice: &mut [u8]) -> Result<(), FieldError> {
-        let a: arith::U256 = self.0.into();
-        a.to_little_endian(slice)
-            .map_err(|_| FieldError::InvalidSliceLength)
-    }
-
     pub fn from_u256(u256: arith::U256) -> Result<Self, FieldError> {
         Ok(Fq(fields::Fq::new(u256).ok_or(FieldError::NotMember)?))
     }
