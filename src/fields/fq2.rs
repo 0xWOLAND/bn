@@ -6,7 +6,7 @@ use rand::Rng;
 cfg_if::cfg_if! {
     if #[cfg(all(target_os = "zkvm"))] {
         use core::mem::transmute;
-        use sp1_lib::io::hint_slice;
+        use sp1_lib::io::{hint_slice, read_vec};
         use std::convert::TryInto;
     }
 }
@@ -172,7 +172,7 @@ impl FieldElement for Fq2 {
         #[cfg(target_os = "zkvm")]
         {
             // Compute the inverse using the zkvm syscall
-            unconstrained! {
+            sp1_lib::unconstrained! {
                 let mut buf = [0u8; 65];
                 self.inverse().map(|inv| {
                     let bytes = unsafe { transmute::<[u128; 4], [u8; 64]>(inv.to_u512().0) };
@@ -188,7 +188,7 @@ impl FieldElement for Fq2 {
                 _ => {
                     let inv =
                         unsafe { transmute::<[u8; 64], Fq2>(bytes[0..64].try_into().unwrap()) };
-                    Some(inv).filter(|inv| !self.is_zero() && self * inv == Fq2::one())
+                    Some(inv).filter(|inv| !self.is_zero() && self * *inv == Fq2::one())
                 }
             }
         }
@@ -332,7 +332,7 @@ impl Fq2 {
         #[cfg(target_os = "zkvm")]
         {
             // Compute the square root using the zkvm syscall
-            unconstrained! {
+            sp1_lib::unconstrained! {
                 let mut buf = [0u8; 65];
                 self.sqrt().map(|sqrt| {
                     let bytes = unsafe { transmute::<[u128; 4], [u8; 64]>(sqrt.to_u512().0) };
@@ -346,8 +346,9 @@ impl Fq2 {
             match bytes[64] {
                 0 => None,
                 _ => {
-                    let sqrt = unsafe { transmute::<[u8; 64], Fq2>(bytes[0..64].try_into().unwrap()) };
-                    Some(sqrt).filter(|sqrt| sqrt * sqrt == *self)
+                    let sqrt =
+                        unsafe { transmute::<[u8; 64], Fq2>(bytes[0..64].try_into().unwrap()) };
+                    Some(sqrt).filter(|sqrt| *sqrt * *sqrt == *self)
                 }
             }
         }

@@ -8,7 +8,7 @@ cfg_if::cfg_if! {
     if #[cfg(all(target_os = "zkvm"))] {
         use bytemuck::cast;
         use core::mem::transmute;
-        use sp1_lib::io::hint_slice;
+        use sp1_lib::io::{hint_slice, read_vec};
         use std::convert::TryInto;
     }
 }
@@ -585,7 +585,7 @@ impl Fq {
         #[cfg(target_os = "zkvm")]
         {
             // Compute the square root using the zkvm syscall
-            unconstrained! {
+            sp1_lib::unconstrained! {
                 let mut buf = [0u8; 33];
                 _sqrt(self).map(|sqrt| {
                     let bytes = unsafe { transmute::<[u128; 2], [u8; 32]>(sqrt.0.0) };
@@ -604,7 +604,7 @@ impl Fq {
                             bytes[0..32].try_into().unwrap(),
                         )))
                     };
-                    Some(sqrt).filter(|s| s * s == *self)
+                    Some(sqrt).filter(|s| *s * *s == *self)
                 }
             }
         }
