@@ -7,9 +7,8 @@ use rand::Rng;
 cfg_if::cfg_if! {
     if #[cfg(target_os = "zkvm")] {
         use bytemuck::cast;
-        use std::mem::transmute;
         use sp1_lib::io::{hint_slice, read_vec};
-        use std::convert::TryInto;
+        use core::{convert::TryInto, mem::transmute};
     }
 }
 

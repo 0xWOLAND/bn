@@ -7,7 +7,7 @@ cfg_if::cfg_if! {
     if #[cfg(target_os = "zkvm")] {
         use core::mem::transmute;
         use sp1_lib::io::{hint_slice, read_vec};
-        use std::convert::TryInto;
+        use core::convert::TryInto;
     }
 }
 
@@ -272,7 +272,7 @@ impl Fq2 {
         Fq2::new(Fq::zero(), Fq::one())
     }
 
-    pub fn sqrt(&self) -> Option<Self> {
+    fn _sqrt(&self) -> Option<Self> {
         let a1 = self.pow::<U256>((*FQ_MINUS3_DIV4).into());
         let a1a = a1._mul(*self);
         let alpha = a1._mul(a1a);
@@ -290,13 +290,13 @@ impl Fq2 {
         }
     }
 
-    fn sqrt_unconstrained(&self) -> Option<Self> {
+    pub fn sqrt(&self) -> Option<Self> {
         #[cfg(target_os = "zkvm")]
         {
             // Compute the square root using the zkvm syscall
             sp1_lib::unconstrained! {
                 let mut buf = [0u8; 65];
-                self.sqrt().map(|sqrt| {
+                self._sqrt().map(|sqrt| {
                     let bytes = unsafe { transmute::<[u128; 4], [u8; 64]>(sqrt.to_u512().0) };
                     buf[0..64].copy_from_slice(&bytes);
                     buf[64] = 1;
@@ -316,7 +316,7 @@ impl Fq2 {
         }
         #[cfg(not(target_os = "zkvm"))]
         {
-            self.sqrt()
+            self._sqrt()
         }
     }
 

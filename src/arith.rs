@@ -2,7 +2,7 @@ use core::cmp::Ordering;
 use crunchy::unroll;
 use rand::Rng;
 
-use byteorder::{BigEndian, ByteOrder, LittleEndian};
+use byteorder::{BigEndian, ByteOrder};
 
 /// 256-bit, stack allocated biginteger for use in prime field
 /// arithmetic.

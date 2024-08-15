@@ -2,14 +2,6 @@ use crate::fields::{const_fq, FieldElement, Fq, Fq2};
 use core::ops::{Add, Mul, Neg, Sub};
 use rand::Rng;
 
-cfg_if::cfg_if! {
-    if #[cfg(target_os = "zkvm")] {
-        use core::mem::transmute;
-        use sp1_lib::io::hint_slice;
-        use std::convert::TryInto;
-    }
-}
-
 fn frobenius_coeffs_c1(n: usize) -> Fq2 {
     match n % 6 {
         0 => Fq2::one(),
