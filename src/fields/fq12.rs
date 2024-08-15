@@ -3,6 +3,14 @@ use crate::fields::{const_fq, FieldElement, Fq, Fq2, Fq6};
 use core::ops::{Add, Mul, Neg, Sub};
 use rand::Rng;
 
+cfg_if::cfg_if! {
+    if #[cfg(target_os = "zkvm")] {
+        use core::mem::transmute;
+        use sp1_lib::io::hint_slice;
+        use std::convert::TryInto;
+    }
+}
+
 fn frobenius_coeffs_c1(power: usize) -> Fq2 {
     match power % 12 {
         0 => Fq2::one(),
@@ -60,7 +68,7 @@ impl Fq12 {
     }
 
     fn final_exponentiation_first_chunk(&self) -> Option<Fq12> {
-        match self.inverse() {
+        match self.inverse_unconstrained() {
             Some(b) => {
                 let a = self.unitary_inverse();
                 let c = a * b;
@@ -312,6 +320,10 @@ impl FieldElement for Fq12 {
             }),
             None => None,
         }
+    }
+
+    fn inverse_unconstrained(self) -> Option<Self> {
+        self.inverse() // same as constrained
     }
 }
 

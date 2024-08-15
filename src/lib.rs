@@ -1,4 +1,4 @@
-#![no_std]
+// #![no_std]
 
 extern crate alloc;
 
@@ -34,7 +34,7 @@ impl Fr {
         fields::Fr::from_str(s).map(|e| Fr(e))
     }
     pub fn inverse(&self) -> Option<Self> {
-        self.0.inverse().map(|e| Fr(e))
+        self.0.inverse_unconstrained().map(|e| Fr(e))
     }
     pub fn is_zero(&self) -> bool {
         self.0.is_zero()
@@ -125,7 +125,7 @@ pub use crate::groups::Error as GroupError;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 #[repr(C)]
-pub struct Fq(fields::Fq);
+pub struct Fq(pub fields::Fq);
 
 impl Fq {
     pub fn zero() -> Self {
@@ -144,7 +144,7 @@ impl Fq {
         fields::Fq::from_str(s).map(|e| Fq(e))
     }
     pub fn inverse(&self) -> Option<Self> {
-        self.0.inverse().map(|e| Fq(e))
+        self.0.inverse_unconstrained().map(|e| Fq(e))
     }
     pub fn is_zero(&self) -> bool {
         self.0.is_zero()
@@ -163,6 +163,7 @@ impl Fq {
         a.to_big_endian(slice)
             .map_err(|_| FieldError::InvalidSliceLength)
     }
+
     pub fn from_u256(u256: arith::U256) -> Result<Self, FieldError> {
         Ok(Fq(fields::Fq::new(u256).ok_or(FieldError::NotMember)?))
     }
@@ -212,7 +213,7 @@ impl Mul for Fq {
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 #[repr(C)]
-pub struct Fq2(fields::Fq2);
+pub struct Fq2(pub fields::Fq2);
 
 impl Fq2 {
     pub fn one() -> Fq2 {
@@ -457,7 +458,7 @@ impl AffineG1 {
     }
 
     pub fn from_jacobian(g1: G1) -> Option<Self> {
-        g1.0.to_affine().map(|x| AffineG1(x))
+        g1.0.to_affine().map(AffineG1)
     }
 }
 
@@ -477,7 +478,7 @@ impl G2 {
     }
 
     pub fn x(&self) -> Fq2 {
-        Fq2(self.0.x().clone())
+        Fq2(*self.0.x())
     }
 
     pub fn set_x(&mut self, x: Fq2) {
@@ -485,7 +486,7 @@ impl G2 {
     }
 
     pub fn y(&self) -> Fq2 {
-        Fq2(self.0.y().clone())
+        Fq2(*self.0.y())
     }
 
     pub fn set_y(&mut self, y: Fq2) {
@@ -493,7 +494,7 @@ impl G2 {
     }
 
     pub fn z(&self) -> Fq2 {
-        Fq2(self.0.z().clone())
+        Fq2(*self.0.z())
     }
 
     pub fn set_z(&mut self, z: Fq2) {
@@ -607,7 +608,7 @@ impl Gt {
         Gt(self.0.pow(exp.0))
     }
     pub fn inverse(&self) -> Option<Self> {
-        self.0.inverse().map(Gt)
+        self.0.inverse_unconstrained().map(Gt)
     }
     pub fn final_exponentiation(&self) -> Option<Self> {
         self.0.final_exponentiation().map(Gt)
@@ -660,7 +661,7 @@ impl AffineG2 {
     }
 
     pub fn x(&self) -> Fq2 {
-        Fq2(self.0.x().clone())
+        Fq2(*self.0.x())
     }
 
     pub fn set_x(&mut self, x: Fq2) {
@@ -668,7 +669,7 @@ impl AffineG2 {
     }
 
     pub fn y(&self) -> Fq2 {
-        Fq2(self.0.y().clone())
+        Fq2(*self.0.y())
     }
 
     pub fn set_y(&mut self, y: Fq2) {
