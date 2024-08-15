@@ -458,7 +458,7 @@ impl AffineG1 {
     }
 
     pub fn from_jacobian(g1: G1) -> Option<Self> {
-        g1.0.to_affine().map(|x| AffineG1(x))
+        g1.0.to_affine().map(AffineG1)
     }
 }
 
@@ -478,7 +478,7 @@ impl G2 {
     }
 
     pub fn x(&self) -> Fq2 {
-        Fq2(self.0.x().clone())
+        Fq2(*self.0.x())
     }
 
     pub fn set_x(&mut self, x: Fq2) {
@@ -486,7 +486,7 @@ impl G2 {
     }
 
     pub fn y(&self) -> Fq2 {
-        Fq2(self.0.y().clone())
+        Fq2(*self.0.y())
     }
 
     pub fn set_y(&mut self, y: Fq2) {
@@ -494,7 +494,7 @@ impl G2 {
     }
 
     pub fn z(&self) -> Fq2 {
-        Fq2(self.0.z().clone())
+        Fq2(*self.0.z())
     }
 
     pub fn set_z(&mut self, z: Fq2) {
@@ -661,7 +661,7 @@ impl AffineG2 {
     }
 
     pub fn x(&self) -> Fq2 {
-        Fq2(self.0.x().clone())
+        Fq2(*self.0.x())
     }
 
     pub fn set_x(&mut self, x: Fq2) {
@@ -669,7 +669,7 @@ impl AffineG2 {
     }
 
     pub fn y(&self) -> Fq2 {
-        Fq2(self.0.y().clone())
+        Fq2(*self.0.y())
     }
 
     pub fn set_y(&mut self, y: Fq2) {

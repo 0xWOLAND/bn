@@ -4,7 +4,7 @@ use core::ops::{Add, Mul, Neg, Sub};
 use rand::Rng;
 
 cfg_if::cfg_if! {
-    if #[cfg(all(target_os = "zkvm"))] {
+    if #[cfg(target_os = "zkvm")] {
         use core::mem::transmute;
         use sp1_lib::io::{hint_slice, read_vec};
         use std::convert::TryInto;
@@ -136,24 +136,10 @@ impl FieldElement for Fq2 {
         *self * *self
     }
 
-    // fn inverse(self) -> Option<Self> {
-    //     // "High-Speed Software Implementation of the Optimal Ate Pairing
-    //     // over Barreto–Naehrig Curves"; Algorithm 8
-
-    //     match (self.c0.squared() - (self.c1.squared() * fq_non_residue())).inverse() {
-    //         Some(t) => Some(Fq2 {
-    //             c0: self.c0 * t,
-    //             c1: -(self.c1 * t),
-    //         }),
-    //         None => None,
-    //     }
-    // }
-
     fn inverse(self) -> Option<Self> {
         // "High-Speed Software Implementation of the Optimal Ate Pairing
         // over Barreto–Naehrig Curves"; Algorithm 8
 
-        // match (self.c0.squared() - (self.c1.squared() * fq_non_residue())).inverse() {
         match (self
             .c0
             ._mul(self.c0)
@@ -203,7 +189,7 @@ impl Mul for Fq2 {
     type Output = Fq2;
 
     fn mul(self, other: Fq2) -> Fq2 {
-        #[cfg(all(target_os = "zkvm"))]
+        #[cfg(target_os = "zkvm")]
         {
             unsafe {
                 let mut lhs = transmute::<Fq2, [u32; 16]>(self);
@@ -212,7 +198,7 @@ impl Mul for Fq2 {
                 transmute::<[u32; 16], Fq2>(lhs)
             }
         }
-        #[cfg(not(all(target_os = "zkvm")))]
+        #[cfg(not(target_os = "zkvm"))]
         {
             // Devegili OhEig Scott Dahab
             //     Multiplication and Squaring on Pairing-Friendly Fields.pdf
@@ -233,22 +219,10 @@ impl Sub for Fq2 {
     type Output = Fq2;
 
     fn sub(self, other: Fq2) -> Fq2 {
-        // #[cfg(all(target_os = "zkvm"))]
-        // {
-        //     unsafe {
-        //         let mut lhs = transmute::<Fq2, [u32; 16]>(self);
-        //         let rhs = transmute::<&Fq2, &[u32; 16]>(&other);
-        //         sp1_lib::syscall_bn254_fp2_submod(lhs.as_mut_ptr(), rhs.as_ptr());
-        //         transmute::<[u32; 16], Fq2>(lhs)
-        //     }
-        // }
-        // #[cfg(not(all(target_os = "zkvm")))]
-        // {
         Fq2 {
             c0: self.c0 - other.c0,
             c1: self.c1 - other.c1,
         }
-        // }
     }
 }
 
@@ -256,22 +230,10 @@ impl Add for Fq2 {
     type Output = Fq2;
 
     fn add(self, other: Fq2) -> Fq2 {
-        // #[cfg(all(target_os = "zkvm"))]
-        // {
-        //     unsafe {
-        //         let mut lhs = transmute::<Fq2, [u32; 16]>(self);
-        //         let rhs = transmute::<&Fq2, &[u32; 16]>(&other);
-        //         sp1_lib::syscall_bn254_fp2_addmod(lhs.as_mut_ptr(), rhs.as_ptr());
-        //         transmute::<[u32; 16], Fq2>(lhs)
-        //     }
-        // }
-        // #[cfg(not(all(target_os = "zkvm")))]
-        // {
         Fq2 {
             c0: self.c0 + other.c0,
             c1: self.c1 + other.c1,
         }
-        // }
     }
 }
 
