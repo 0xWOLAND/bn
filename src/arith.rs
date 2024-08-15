@@ -297,7 +297,7 @@ impl U256 {
 
     /// Multiply `self` by `other` (mod `modulo`)
     pub fn mul(&mut self, other: &U256, modulo: &U256) {
-        #[cfg(all(target_os = "zkvm"))]
+        #[cfg(target_os = "zkvm")]
         {
             let mod_ptr: *const [u32; 8] = (&modulo.0) as *const [u128; 2] as *const [u32; 8];
             let x_ptr: *const [u32; 8] = (&self.0) as *const [u128; 2] as *const [u32; 8];
@@ -307,7 +307,7 @@ impl U256 {
                 sp1_lib::sys_bigint(res_ptr, 0, x_ptr, y_ptr, mod_ptr);
             }
         }
-        #[cfg(not(all(target_os = "zkvm")))]
+        #[cfg(not(target_os = "zkvm"))]
         {
             let mut res = [0u128; 4];
 

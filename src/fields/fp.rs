@@ -5,9 +5,9 @@ use core::ops::{Add, Mul, Neg, Sub};
 use rand::Rng;
 
 cfg_if::cfg_if! {
-    if #[cfg(all(target_os = "zkvm"))] {
+    if #[cfg(target_os = "zkvm")] {
         use bytemuck::cast;
-        use core::mem::transmute;
+        use std::mem::transmute;
         use sp1_lib::io::{hint_slice, read_vec};
         use std::convert::TryInto;
     }
@@ -143,6 +143,14 @@ impl Fr {
     pub fn set_bit(&mut self, bit: usize, to: bool) {
         self.0.set_bit(bit, to);
     }
+
+    // This is used for arithmetic in unconstrained mode
+    #[inline]
+    pub(crate) fn _mul(mut self, other: Fr) -> Fr {
+        self.0.mul(&other.0, &Self::modulus());
+
+        self
+    }
 }
 
 impl FieldElement for Fr {
@@ -175,7 +183,7 @@ impl FieldElement for Fr {
     }
 
     fn inverse_unconstrained(self) -> Option<Self> {
-        #[cfg(all(target_os = "zkvm"))]
+        #[cfg(target_os = "zkvm")]
         {
             sp1_lib::unconstrained! {
                 let mut buf = [0u8; 33];
@@ -189,7 +197,7 @@ impl FieldElement for Fr {
             Some(inv).filter(|inv| !self.is_zero() && self * *inv == Fr::one())
         }
 
-        #[cfg(not(all(target_os = "zkvm")))]
+        #[cfg(not(target_os = "zkvm"))]
         {
             self.inverse()
         }
@@ -223,9 +231,27 @@ impl Mul for Fr {
 
     #[inline]
     fn mul(mut self, other: Fr) -> Fr {
-        self.0.mul(&other.0, &Self::modulus());
-
-        self
+        #[cfg(target_os = "zkvm")]
+        {
+            let mut result: [u32; 8] = [0u32; 8];
+            let lhs = cast::<[u128; 2], [u32; 8]>(self.0 .0);
+            let rhs = cast::<[u128; 2], [u32; 8]>(other.0 .0);
+            let modulus = cast::<[u128; 2], [u32; 8]>(Fr::modulus().0);
+            unsafe {
+                sp1_lib::sys_bigint(
+                    &mut result as *mut [u32; 8],
+                    0,
+                    &lhs as *const [u32; 8],
+                    &rhs as *const [u32; 8],
+                    &modulus as *const [u32; 8],
+                );
+                Self(U256::from(cast::<[u32; 8], [u64; 4]>(result)))
+            }
+        }
+        #[cfg(not(target_os = "zkvm"))]
+        {
+            self._mul(other)
+        }
     }
 }
 
@@ -386,21 +412,29 @@ impl Fq {
         self.0.set_bit(bit, to);
     }
 
+    // This is used for arithmetic in unconstrained mode
+    #[inline]
     pub(crate) fn _add(mut self, other: Fq) -> Fq {
         self.0.add(&other.0, &Self::modulus());
         self
     }
 
+    // This is used for arithmetic in unconstrained mode
+    #[inline]
     pub(crate) fn _sub(mut self, other: Fq) -> Fq {
         self.0.sub(&other.0, &Self::modulus());
         self
     }
 
+    // This is used for arithmetic in unconstrained mode
+    #[inline]
     pub(crate) fn _mul(mut self, other: Fq) -> Fq {
         self.0.mul(&other.0, &Self::modulus());
         self
     }
 
+    // This is used for arithmetic in unconstrained mode
+    #[inline]
     pub(crate) fn _neg(mut self) -> Fq {
         self.0.neg(&Self::modulus());
         self
@@ -438,21 +472,21 @@ impl FieldElement for Fq {
     }
 
     fn inverse_unconstrained(self) -> Option<Self> {
-        #[cfg(all(target_os = "zkvm"))]
+        #[cfg(target_os = "zkvm")]
         {
             sp1_lib::unconstrained! {
                 let mut buf = [0u8; 32];
-                let bytes = unsafe { transmute::<[u128; 2], [u8; 32]>(self.inverse().unwrap().0.0) };
+                let bytes = unsafe { cast::<[u128; 2], [u8; 32]>(self.inverse().unwrap().0.0) };
                 buf.copy_from_slice(bytes.as_slice());
                 hint_slice(&buf);
             }
 
             let bytes: [u8; 32] = sp1_lib::io::read_vec().try_into().unwrap();
-            let inv = unsafe { Fq(U256(transmute::<[u8; 32], [u128; 2]>(bytes))) };
+            let inv = unsafe { Fq(U256(cast::<[u8; 32], [u128; 2]>(bytes))) };
             Some(inv).filter(|inv| !self.is_zero() && self * *inv == Fq::one())
         }
 
-        #[cfg(not(all(target_os = "zkvm")))]
+        #[cfg(not(target_os = "zkvm"))]
         {
             self.inverse()
         }
@@ -464,7 +498,7 @@ impl Add for Fq {
 
     #[inline]
     fn add(mut self, other: Fq) -> Fq {
-        #[cfg(all(target_os = "zkvm"))]
+        #[cfg(target_os = "zkvm")]
         {
             unsafe {
                 let mut lhs = cast::<[u128; 2], [u32; 8]>(self.0 .0);
@@ -473,7 +507,7 @@ impl Add for Fq {
                 Self(U256::from(cast::<[u32; 8], [u64; 4]>(lhs)))
             }
         }
-        #[cfg(not(all(target_os = "zkvm")))]
+        #[cfg(not(target_os = "zkvm"))]
         {
             self._add(other)
         }
@@ -485,7 +519,7 @@ impl Sub for Fq {
 
     #[inline]
     fn sub(mut self, other: Fq) -> Fq {
-        #[cfg(all(target_os = "zkvm"))]
+        #[cfg(target_os = "zkvm")]
         {
             unsafe {
                 let mut lhs = cast::<[u128; 2], [u32; 8]>(self.0 .0);
@@ -495,7 +529,7 @@ impl Sub for Fq {
                 Self(U256::from(cast::<[u32; 8], [u64; 4]>(lhs)))
             }
         }
-        #[cfg(not(all(target_os = "zkvm")))]
+        #[cfg(not(target_os = "zkvm"))]
         {
             self._sub(other)
         }
@@ -507,7 +541,7 @@ impl Mul for Fq {
 
     #[inline]
     fn mul(mut self, other: Fq) -> Fq {
-        #[cfg(all(target_os = "zkvm"))]
+        #[cfg(target_os = "zkvm")]
         {
             unsafe {
                 let mut lhs = cast::<[u128; 2], [u32; 8]>(self.0 .0);
@@ -516,7 +550,7 @@ impl Mul for Fq {
                 Self(U256::from(cast::<[u32; 8], [u64; 4]>(lhs)))
             }
         }
-        #[cfg(not(all(target_os = "zkvm")))]
+        #[cfg(not(target_os = "zkvm"))]
         {
             self.0.mul(&other.0, &Self::modulus());
 
@@ -530,16 +564,16 @@ impl Neg for Fq {
 
     #[inline]
     fn neg(mut self) -> Fq {
-        #[cfg(all(target_os = "zkvm"))]
+        #[cfg(target_os = "zkvm")]
         {
             unsafe {
                 let mut lhs = [0u32; 8];
                 let rhs = transmute::<&[u128; 2], &[u32; 8]>(&(self.0 .0));
                 sp1_lib::syscall_bn254_fp_submod(lhs.as_mut_ptr(), rhs.as_ptr());
-                Self(U256::from(transmute::<[u32; 8], [u64; 4]>(lhs)))
+                Self(U256::from(cast::<[u32; 8], [u64; 4]>(lhs)))
             }
         }
-        #[cfg(not(all(target_os = "zkvm")))]
+        #[cfg(not(target_os = "zkvm"))]
         {
             self._neg()
         }
@@ -569,6 +603,7 @@ lazy_static::lazy_static! {
 
 impl Fq {
     pub fn sqrt(&self) -> Option<Self> {
+        // This is used for arithmetic in unconstrained mode
         fn _sqrt(f: &Fq) -> Option<Fq> {
             let a1 = f.pow(*FQ_MINUS3_DIV4);
             let a1a = a1._mul(*f);
@@ -588,7 +623,7 @@ impl Fq {
             sp1_lib::unconstrained! {
                 let mut buf = [0u8; 33];
                 _sqrt(self).map(|sqrt| {
-                    let bytes = unsafe { transmute::<[u128; 2], [u8; 32]>(sqrt.0.0) };
+                    let bytes = unsafe { cast::<[u128; 2], [u8; 32]>(sqrt.0.0) };
                     buf[0..32].copy_from_slice(&bytes);
                     buf[32] = 1;
                 });
@@ -600,7 +635,7 @@ impl Fq {
                 0 => None,
                 _ => {
                     let sqrt = unsafe {
-                        Fq(U256(transmute::<[u8; 32], [u128; 2]>(
+                        Fq(U256(cast::<[u8; 32], [u128; 2]>(
                             bytes[0..32].try_into().unwrap(),
                         )))
                     };
