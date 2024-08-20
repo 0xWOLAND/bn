@@ -197,6 +197,16 @@ pub enum Error {
     InvalidLength { expected: usize, actual: usize },
 }
 
+impl Display for Error {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Error::InvalidLength { expected, actual } => {
+                write!(f, "Invalid length: expected {expected}, but was {actual}")
+            }
+        }
+    }
+}
+
 impl U256 {
     /// Initialize U256 from slice of bytes (big endian)
     pub fn from_slice(s: &[u8]) -> Result<U256, Error> {

@@ -10,7 +10,7 @@ use crate::fields::FieldElement;
 use crate::groups::{G1Params, G2Params, GroupElement, GroupParams};
 
 use alloc::vec::Vec;
-use core::ops::{Add, Mul, Neg, Sub};
+use core::fmt::Display;
 use rand::Rng;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -107,12 +107,33 @@ pub enum FieldError {
     NotMember,
 }
 
+impl Display for FieldError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            FieldError::InvalidSliceLength => write!(f, "Invalid slice length"),
+            FieldError::InvalidU512Encoding => write!(f, "Invalid U512 encoding"),
+            FieldError::NotMember => write!(f, "Not a member"),
+        }
+    }
+}
+
 #[derive(Debug)]
 pub enum CurveError {
     InvalidEncoding,
     NotMember,
     Field(FieldError),
     ToAffineConversion,
+}
+
+impl Display for CurveError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            CurveError::InvalidEncoding => write!(f, "Invalid encoding"),
+            CurveError::NotMember => write!(f, "Not a member"),
+            CurveError::Field(field) => write!(f, "Field: {field}"),
+            CurveError::ToAffineConversion => write!(f, "ToAffine conversion"),
+        }
+    }
 }
 
 impl From<FieldError> for CurveError {
@@ -650,7 +671,7 @@ pub fn miller_loop_batch(pairs: &[(G2, G1)]) -> Result<Gt, CurveError> {
     Ok(Gt(groups::miller_loop_batch(&ps, &qs)))
 }
 
-#[derive(Copy, Clone, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 #[repr(C)]
 pub struct AffineG2(groups::AffineG2);
 
