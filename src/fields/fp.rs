@@ -265,6 +265,19 @@ impl Fq {
     }
 }
 
+impl Ord for Fq {
+    fn cmp(&self, other: &Self) -> core::cmp::Ordering {
+        self.0.cmp(&other.0)
+    }
+}
+
+impl PartialOrd for Fq {
+    #[inline(always)]
+    fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
 impl Sqrt for Fq {
     fn sqrt(&self) -> Option<Self> {
         self.sqrt()

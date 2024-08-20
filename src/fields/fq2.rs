@@ -1,5 +1,6 @@
 use crate::arith::{U256, U512};
 use crate::fields::{const_fq, FieldElement, Fq};
+use core::cmp::Ordering;
 use core::ops::{Add, Mul, Neg, Sub};
 use rand::Rng;
 
@@ -117,6 +118,23 @@ impl FieldElement for Fq2 {
             }),
             None => None,
         }
+    }
+}
+
+impl Ord for Fq2 {
+    fn cmp(&self, other: &Self) -> Ordering {
+        match self.c1.cmp(&other.c1) {
+            Ordering::Greater => Ordering::Greater,
+            Ordering::Less => Ordering::Less,
+            Ordering::Equal => self.c0.cmp(&other.c0),
+        }
+    }
+}
+
+impl PartialOrd for Fq2 {
+    #[inline(always)]
+    fn partial_cmp(&self, other: &Self) -> Option<core::cmp::Ordering> {
+        Some(self.cmp(other))
     }
 }
 
