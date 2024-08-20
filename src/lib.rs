@@ -11,6 +11,7 @@ use crate::groups::{G1Params, G2Params, GroupElement, GroupParams};
 
 use alloc::vec::Vec;
 use core::fmt::Display;
+use core::ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign};
 use rand::Rng;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -68,7 +69,7 @@ impl Fr {
     }
 }
 
-impl Add<Fr> for Fr {
+impl Add for Fr {
     type Output = Fr;
 
     fn add(self, other: Fr) -> Fr {
@@ -76,11 +77,23 @@ impl Add<Fr> for Fr {
     }
 }
 
-impl Sub<Fr> for Fr {
+impl AddAssign for Fr {
+    fn add_assign(&mut self, rhs: Self) {
+        *self = *self + rhs;
+    }
+}
+
+impl Sub for Fr {
     type Output = Fr;
 
     fn sub(self, other: Fr) -> Fr {
         Fr(self.0 - other.0)
+    }
+}
+
+impl SubAssign for Fr {
+    fn sub_assign(&mut self, rhs: Self) {
+        *self = *self - rhs;
     }
 }
 
@@ -97,6 +110,12 @@ impl Mul for Fr {
 
     fn mul(self, other: Fr) -> Fr {
         Fr(self.0 * other.0)
+    }
+}
+
+impl MulAssign for Fr {
+    fn mul_assign(&mut self, rhs: Self) {
+        *self = *self * rhs;
     }
 }
 
