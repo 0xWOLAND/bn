@@ -3,6 +3,8 @@ use crate::fields::{const_fq, FieldElement, Fq};
 use core::ops::{Add, Mul, Neg, Sub};
 use rand::Rng;
 
+use super::Sqrt;
+
 #[inline]
 fn fq_non_residue() -> Fq {
     // (q - 1) is a quadratic nonresidue in Fq
@@ -115,6 +117,12 @@ impl FieldElement for Fq2 {
             }),
             None => None,
         }
+    }
+}
+
+impl Sqrt for Fq2 {
+    fn sqrt(&self) -> Option<Self> {
+        self.sqrt()
     }
 }
 

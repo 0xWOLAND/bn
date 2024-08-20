@@ -4,6 +4,8 @@ use alloc::vec::Vec;
 use core::ops::{Add, Mul, Neg, Sub};
 use rand::Rng;
 
+use super::Sqrt;
+
 macro_rules! field_impl {
     ($name:ident, $modulus:expr, $rinv:expr, $r:expr) => {
         #[derive(Copy, Clone, PartialEq, Eq, Debug)]
@@ -260,6 +262,12 @@ impl Fq {
         } else {
             Some(a1a)
         }
+    }
+}
+
+impl Sqrt for Fq {
+    fn sqrt(&self) -> Option<Self> {
+        self.sqrt()
     }
 }
 

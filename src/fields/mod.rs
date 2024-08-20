@@ -47,6 +47,10 @@ pub trait FieldElement:
     }
 }
 
+pub trait Sqrt: Sized {
+    fn sqrt(&self) -> Option<Self>;
+}
+
 #[cfg(test)]
 mod tests;
 
