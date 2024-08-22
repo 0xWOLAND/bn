@@ -1,5 +1,5 @@
 use crate::arith::U256;
-use crate::fields::{const_fq, fq2_nonresidue, FieldElement, Fq, Fq12, Fq2, Fr};
+use crate::fields::{const_fq, fq2_nonresidue, FieldElement, Fq, Fq12, Fq2, Fr, Sqrt};
 #[cfg(test)]
 use alloc::vec;
 use alloc::vec::Vec;
@@ -40,13 +40,27 @@ pub trait GroupElement:
 }
 
 pub trait GroupParams: Sized + fmt::Debug {
-    type Base: FieldElement;
+    type Base: FieldElement + Ord + Sqrt;
 
     fn name() -> &'static str;
     fn one() -> G<Self>;
     fn coeff_b() -> Self::Base;
     fn check_order() -> bool {
         false
+    }
+
+    /// Helper method for computing `elem + b`.
+    ///
+    /// The default implementation should be overridden only if
+    /// the sum can be computed faster than standard field addition (eg: via
+    /// doubling).
+    #[inline(always)]
+    fn add_b(elem: Self::Base) -> Self::Base {
+        if Self::coeff_b().is_zero() {
+            elem
+        } else {
+            elem + Self::coeff_b()
+        }
     }
 }
 
@@ -143,6 +157,24 @@ impl<P: GroupParams> AffineG<P> {
 
     pub fn y_mut(&mut self) -> &mut P::Base {
         &mut self.y
+    }
+
+    /// Returns the two possible y-coordinates corresponding to the given x-coordinate.
+    /// The corresponding points are not guaranteed to be in the prime-order subgroup,
+    /// but are guaranteed to be on the curve. That is, this method returns `None`
+    /// if the x-coordinate corresponds to a non-curve point.
+    ///
+    /// The results are sorted by lexicographical order.
+    /// This means that, if `P::BaseField: PrimeField`, the results are sorted as integers.
+    pub fn get_ys_from_x_unchecked(x: P::Base) -> Option<(P::Base, P::Base)> {
+        // Compute the curve equation x^3 + Ax + B.
+        let x3_plus_ax_plus_b = P::add_b(x.squared() * x);
+        let y = x3_plus_ax_plus_b.sqrt()?;
+        let neg_y = -y;
+        match y < neg_y {
+            true => Some((y, neg_y)),
+            false => Some((neg_y, y)),
+        }
     }
 }
 
@@ -4471,4 +4503,13 @@ fn test_y_at_point_at_infinity() {
 
     assert!(G2::zero().y == Fq2::one());
     assert!((-G2::zero()).y == Fq2::one());
+}
+
+#[test]
+fn test_get_ys_from_x() {
+    let x = Fq::from_str("1").unwrap();
+
+    let (y, _) = AffineG1::get_ys_from_x_unchecked(x).unwrap();
+
+    assert_eq!(y, Fq::from_str("2").unwrap());
 }
