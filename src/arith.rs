@@ -557,6 +557,26 @@ fn mac_digit(from_index: usize, acc: &mut [u128; 4], b: &[u128; 2], c: u128) {
     debug_assert!(carry == 0);
 }
 
+/// The result of this function is only approximately `ln(a)`
+/// [`Explanation of usage`]
+///
+/// [`Explanation of usage`]: https://github.com/scipr-lab/zexe/issues/79#issue-556220473
+pub fn ln_without_floats(a: usize) -> usize {
+    // log2(a) * ln(2)
+    (log2(a) * 69 / 100) as usize
+}
+
+/// Returns the ceiling of the base-2 logarithm of `x`.
+pub fn log2(x: usize) -> u32 {
+    if x == 0 {
+        0
+    } else if x.is_power_of_two() {
+        1usize.leading_zeros() - x.leading_zeros()
+    } else {
+        0usize.leading_zeros() - x.leading_zeros()
+    }
+}
+
 #[test]
 fn setting_bits() {
     let rng = &mut ::rand::thread_rng();
