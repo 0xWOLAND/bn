@@ -1,4 +1,4 @@
-use core::cmp::Ordering;
+use core::{cmp::Ordering, fmt::Display};
 use crunchy::unroll;
 use rand::Rng;
 

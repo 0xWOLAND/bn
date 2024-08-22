@@ -3,6 +3,7 @@ use crate::fields::{const_fq, fq2_nonresidue, FieldElement, Fq, Fq12, Fq2, Fr};
 #[cfg(test)]
 use alloc::vec;
 use alloc::vec::Vec;
+use core::fmt::Display;
 use core::{
     fmt,
     ops::{Add, Mul, Neg, Sub},
@@ -96,6 +97,15 @@ pub struct AffineG<P: GroupParams> {
 pub enum Error {
     NotOnCurve,
     NotInSubgroup,
+}
+
+impl Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Error::NotOnCurve => write!(f, "Not on curve"),
+            Error::NotInSubgroup => write!(f, "Not in subgroup"),
+        }
+    }
 }
 
 impl<P: GroupParams> AffineG<P> {
