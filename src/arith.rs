@@ -1,3 +1,4 @@
+use alloc::vec::Vec;
 use core::{cmp::Ordering, fmt::Display};
 use crunchy::unroll;
 use rand::Rng;
@@ -238,6 +239,14 @@ impl U256 {
         }
 
         Ok(())
+    }
+
+    pub fn to_bytes_be(&self) -> Result<Vec<u8>, Error> {
+        let mut buf = Vec::new();
+
+        self.to_big_endian(&mut buf)?;
+
+        Ok(buf)
     }
 
     #[inline]
