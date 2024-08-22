@@ -480,6 +480,10 @@ impl AffineG1 {
         Ok(AffineG1(groups::AffineG1::new(x.0, y.0)?))
     }
 
+    pub fn identity() -> Self {
+        Self(groups::AffineG1::new(fields::Fq::zero(), fields::Fq::zero()).unwrap())
+    }
+
     pub fn x(&self) -> Fq {
         Fq(self.0.x().clone())
     }
