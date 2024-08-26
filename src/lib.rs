@@ -521,6 +521,16 @@ impl AffineG1 {
     pub fn from_jacobian(g1: G1) -> Option<Self> {
         g1.0.to_affine().map(|x| AffineG1(x))
     }
+
+    pub fn get_ys_from_x_unchecked(x: Fq) -> Option<(Fq, Fq)> {
+        groups::AffineG1::get_ys_from_x_unchecked(x.0).map(|(neq_y, y)| (Fq(neq_y), Fq(y)))
+    }
+}
+
+impl Default for AffineG1 {
+    fn default() -> Self {
+        Self::identity()
+    }
 }
 
 impl From<AffineG1> for G1 {
