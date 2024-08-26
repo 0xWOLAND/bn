@@ -684,6 +684,10 @@ impl Gt {
     pub fn final_exponentiation(&self) -> Option<Self> {
         self.0.final_exponentiation().map(Gt)
     }
+
+    pub fn is_zero(&self) -> bool {
+        self.0.is_zero()
+    }
 }
 
 impl Mul<Gt> for Gt {
