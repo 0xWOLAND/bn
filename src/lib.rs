@@ -428,6 +428,10 @@ impl G1 {
             .map_err(|_| CurveError::NotMember)
             .map(Into::into)
     }
+
+    pub fn to_affine(&self) -> Option<AffineG1> {
+        self.0.to_affine().map(|a| AffineG1(a))
+    }
 }
 
 impl Group for G1 {
