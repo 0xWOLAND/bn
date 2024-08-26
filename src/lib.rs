@@ -177,7 +177,7 @@ impl From<FieldError> for CurveError {
 
 pub use crate::groups::Error as GroupError;
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Ord, PartialOrd)]
 #[repr(C)]
 pub struct Fq(fields::Fq);
 
