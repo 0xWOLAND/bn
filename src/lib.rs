@@ -377,6 +377,13 @@ impl G1 {
         G1(groups::G1::new(x.0, y.0, z.0))
     }
 
+    pub fn msm(bases: &Vec<AffineG1>, scalars: &Vec<Fr>) -> Self {
+        let bases = bases.into_iter().map(|b| b.0).collect();
+        let scalars = scalars.into_iter().map(|s| s.into_u256()).collect();
+
+        G1(groups::G1::msm(bases, scalars))
+    }
+
     pub fn x(&self) -> Fq {
         Fq(self.0.x().clone())
     }

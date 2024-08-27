@@ -32,6 +32,9 @@ pub trait FieldElement:
     fn squared(&self) -> Self {
         (*self) * (*self)
     }
+    fn double(&self) -> Self {
+        (*self) + (*self)
+    }
     fn inverse(self) -> Option<Self>;
     fn pow<I: Into<U256>>(&self, by: I) -> Self {
         let mut res = Self::one();
@@ -44,6 +47,15 @@ pub trait FieldElement:
         }
 
         res
+    }
+    fn sum_of_products<const N: usize>(a: &[Self; N], b: &[Self; N]) -> Self {
+        let mut sum = Self::zero();
+
+        for i in 0..N {
+            sum = sum + (a[i] * b[i])
+        }
+
+        sum
     }
 }
 

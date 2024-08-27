@@ -1,9 +1,10 @@
-use crate::arith::U256;
+use crate::arith::{ln_without_floats, U256};
 use crate::fields::{const_fq, fq2_nonresidue, FieldElement, Fq, Fq12, Fq2, Fr, Sqrt};
-#[cfg(test)]
 use alloc::vec;
 use alloc::vec::Vec;
+use core::cmp;
 use core::fmt::Display;
+use core::ops::AddAssign;
 use core::{
     fmt,
     ops::{Add, Mul, Neg, Sub},
@@ -19,6 +20,8 @@ const ATE_LOOP_COUNT_NAF: [u8; 64] = [
     1, 0, 1, 0, 0, 0, 3, 0, 3, 0, 0, 0, 3, 0, 1, 0, 3, 0, 0, 3, 0, 0, 0, 0, 0, 1, 0, 0, 3, 0, 1, 0,
     0, 3, 0, 0, 0, 0, 3, 0, 1, 0, 0, 0, 3, 0, 3, 0, 0, 1, 0, 0, 0, 3, 0, 0, 3, 0, 1, 0, 1, 0, 0, 0,
 ];
+
+const MODULUS_BIT_SIZE: usize = 254;
 
 pub trait GroupElement:
     Sized
@@ -73,7 +76,99 @@ pub struct G<P: GroupParams> {
 
 impl<P: GroupParams> G<P> {
     pub fn new(x: P::Base, y: P::Base, z: P::Base) -> Self {
-        G { x: x, y: y, z: z }
+        G { x, y, z }
+    }
+
+    pub fn msm(bases: Vec<AffineG<P>>, scalars: Vec<U256>) -> Self {
+        let size = cmp::min(bases.len(), scalars.len());
+        let scalars = &scalars[..size];
+        let bases = &bases[..size];
+        let scalars_and_bases_iter = scalars.iter().zip(bases).filter(|(s, _)| !s.is_zero());
+
+        let c = if size < 32 {
+            3
+        } else {
+            ln_without_floats(size) + 2
+        };
+
+        let one = U256::from(1);
+        let zero = Self::zero();
+        let window_starts: Vec<_> = (0..MODULUS_BIT_SIZE).step_by(c).collect();
+
+        // Each window is of size `c`.
+        // We divide up the bits 0..num_bits into windows of size `c`, and
+        // in parallel process each such window.
+        let window_sums: Vec<_> = window_starts
+            .into_iter()
+            .map(|w_start| {
+                let mut res = zero;
+                // We don't need the "zero" bucket, so we only have 2^c - 1 buckets.
+                let mut buckets = vec![zero; (1 << c) - 1];
+                // This clone is cheap, because the iterator contains just a
+                // pointer and an index into the original vectors.
+                scalars_and_bases_iter.clone().for_each(|(&scalar, base)| {
+                    if scalar == one {
+                        // We only process unit scalars once in the first window.
+                        if w_start == 0 {
+                            res += base;
+                        }
+                    } else {
+                        let mut scalar = scalar;
+
+                        // We right-shift by w_start, thus getting rid of the
+                        // lower bits.
+                        scalar >>= w_start as u32;
+
+                        // We mod the remaining bits by 2^{window size}, thus taking `c` bits.
+                        let scalar = scalar.0[0] % (1 << c);
+
+                        // If the scalar is non-zero, we update the corresponding
+                        // bucket.
+                        // (Recall that `buckets` doesn't have a zero bucket.)
+                        if scalar != 0 {
+                            buckets[(scalar - 1) as usize] += base;
+                        }
+                    }
+                });
+
+                // Compute sum_{i in 0..num_buckets} (sum_{j in i..num_buckets} bucket[j])
+                // This is computed below for b buckets, using 2b curve additions.
+                //
+                // We could first normalize `buckets` and then use mixed-addition
+                // here, but that's slower for the kinds of groups we care about
+                // (Short Weierstrass curves and Twisted Edwards curves).
+                // In the case of Short Weierstrass curves,
+                // mixed addition saves ~4 field multiplications per addition.
+                // However normalization (with the inversion batched) takes ~6
+                // field multiplications per element,
+                // hence batch normalization is a slowdown.
+
+                // `running_sum` = sum_{j in i..num_buckets} bucket[j],
+                // where we iterate backward from i = num_buckets to 0.
+                let mut running_sum = Self::zero();
+                buckets.into_iter().rev().for_each(|b| {
+                    running_sum += b;
+                    res += running_sum;
+                });
+                res
+            })
+            .collect();
+
+        // We store the sum for the lowest window.
+        let lowest = *window_sums.first().unwrap();
+
+        // We're traversing windows from high to low.
+        lowest
+            + window_sums[1..]
+                .iter()
+                .rev()
+                .fold(zero, |mut total, sum_i| {
+                    total += *sum_i;
+                    for _ in 0..c {
+                        total = total.double();
+                    }
+                    total
+                })
     }
 
     pub fn x(&self) -> &P::Base {
@@ -378,6 +473,90 @@ impl<P: GroupParams> Add<G<P>> for G<P> {
                 y: r * (v - x3) - (s1_j + s1_j),
                 z: ((self.z + other.z).squared() - z1_squared - z2_squared) * h,
             }
+        }
+    }
+}
+
+impl<P: GroupParams> AddAssign for G<P> {
+    fn add_assign(&mut self, rhs: Self) {
+        *self = *self + rhs
+    }
+}
+
+impl<P: GroupParams> AddAssign<&AffineG<P>> for G<P> {
+    fn add_assign(&mut self, other: &AffineG<P>) {
+        let other_x = other.x;
+        let other_y = other.y;
+
+        if self.is_zero() {
+            self.x = other_x;
+            self.y = other_y;
+            self.z = P::Base::one();
+            return;
+        }
+
+        // Z1Z1 = Z1^2
+        let mut z1z1 = self.z;
+        z1z1 = z1z1.squared();
+
+        // U2 = X2*Z1Z1
+        let mut u2 = other_x;
+        u2 = u2 * z1z1;
+
+        // S2 = Y2*Z1*Z1Z1
+        let mut s2 = self.z;
+        s2 = s2 * other_y;
+        s2 = s2 * z1z1;
+
+        if self.x == u2 {
+            if self.y == s2 {
+                // The two points are equal, so we double.
+                *self = self.double();
+            } else {
+                // a + (-a) = 0
+                *self = Self::zero()
+            }
+        } else {
+            // H = U2-X1
+            let mut h = u2;
+            h = h - self.x;
+
+            // HH = H^2
+            let mut hh = h;
+            hh = hh.squared();
+
+            // I = 4*HH
+            let mut i = hh;
+            i = i.double().double();
+
+            // J = -H*I
+            let mut j = h;
+            j = j.neg();
+            j = j * i;
+
+            // r = 2*(S2-Y1)
+            let mut r = s2;
+            r = r - self.y;
+            r = r.double();
+
+            // V = X1*I
+            let mut v = self.x;
+            v = v * i;
+
+            // X3 = r^2 + J - 2*V
+            self.x = r.squared();
+            self.x = self.x + j;
+            self.x = self.x - v.double();
+
+            // Y3 = r*(V-X3) + 2*Y1*J
+            v = v - self.x;
+            self.y = self.y.double();
+            self.y = P::Base::sum_of_products(&[r, self.y], &[v, j]);
+
+            // Z3 = 2 * Z1 * H;
+            // Can alternatively be computed as (Z1+H)^2-Z1Z1-HH, but the latter is slower.
+            self.z = self.z * h;
+            self.z = self.z.double();
         }
     }
 }
@@ -4512,4 +4691,27 @@ fn test_get_ys_from_x() {
     let (y, _) = AffineG1::get_ys_from_x_unchecked(x).unwrap();
 
     assert_eq!(y, Fq::from_str("2").unwrap());
+}
+
+#[test]
+fn test_msm() {
+    let rng = &mut rand::thread_rng();
+
+    let a = G1::random(rng);
+    let b = G1::random(rng);
+    let c = G1::random(rng);
+    let s1 = Fr::random(rng);
+    let s2 = Fr::random(rng);
+    let s3 = Fr::random(rng);
+
+    let r = G1::msm(
+        vec![
+            a.to_affine().unwrap(),
+            b.to_affine().unwrap(),
+            c.to_affine().unwrap(),
+        ],
+        vec![s1.into(), s2.into(), s3.into()],
+    );
+
+    assert_eq!(r, a * s1 + b * s2 + c * s3)
 }
