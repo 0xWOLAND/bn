@@ -1,5 +1,5 @@
 use alloc::vec::Vec;
-use core::{cmp::Ordering, fmt::Display};
+use core::{cmp::Ordering, fmt::Display, ops::ShrAssign};
 use crunchy::unroll;
 use rand::Rng;
 
@@ -409,6 +409,39 @@ impl U256 {
     /// MSB to LSB.
     pub fn bits(&self) -> BitIterator {
         BitIterator { int: &self, n: 256 }
+    }
+}
+
+impl ShrAssign<u32> for U256 {
+    /// Computes the bitwise shift right operation in place.
+    ///
+    /// Differently from the built-in numeric types (u8, u32, u64, etc.) this
+    /// operation does *not* return an underflow error if the number of bits
+    /// shifted is larger than 2 * 128. Instead the result will be saturated to
+    /// zero.
+    fn shr_assign(&mut self, mut rhs: u32) {
+        if rhs >= (128 * 2) as u32 {
+            *self = Self::from(0u64);
+            return;
+        }
+
+        while rhs >= 128 {
+            let mut t = 0;
+            for limb in self.0.iter_mut().rev() {
+                core::mem::swap(&mut t, limb);
+            }
+            rhs -= 128;
+        }
+
+        if rhs > 0 {
+            let mut t = 0;
+            for a in self.0.iter_mut().rev() {
+                let t2 = *a << (128 - rhs);
+                *a >>= rhs;
+                *a |= t;
+                t = t2;
+            }
+        }
     }
 }
 
@@ -863,4 +896,14 @@ fn testing_mul2() {
     ]);
     r_inv.mul(&one, &modulo);
     assert_eq!(r_inv, U256::from([1, 0, 0, 0]));
+}
+
+#[test]
+fn test_shr() {
+    let mut a = U256::from(0b010001101010100101010101010010101_u64);
+    let b = U256::from(0b0100011010101001010101_u64);
+
+    a >>= 11;
+
+    assert_eq!(a, b);
 }
